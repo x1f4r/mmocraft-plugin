@@ -8,18 +8,19 @@ import com.x1f4r.mmocraft.command.BasicCommandRegistryService;
 import com.x1f4r.mmocraft.command.CommandRegistryService;
 import com.x1f4r.mmocraft.command.commands.MMOCraftInfoCommand;
 import com.x1f4r.mmocraft.eventbus.events.PluginReloadedEvent;
-import com.x1f4r.mmocraft.persistence.PersistenceService;
-import com.x1f4r.mmocraft.persistence.SqlitePersistenceService;
-import com.x1f4r.mmocraft.command.BasicCommandRegistryService;
-import com.x1f4r.mmocraft.command.CommandRegistryService;
-import com.x1f4r.mmocraft.command.commands.MMOCraftInfoCommand;
 import com.x1f4r.mmocraft.config.BasicConfigService;
 import com.x1f4r.mmocraft.config.ConfigService;
 import com.x1f4r.mmocraft.eventbus.BasicEventBusService;
 import com.x1f4r.mmocraft.eventbus.EventBusService;
+import com.x1f4r.mmocraft.command.BasicCommandRegistryService;
+import com.x1f4r.mmocraft.command.CommandRegistryService;
+import com.x1f4r.mmocraft.command.commands.MMOCraftInfoCommand;
 import com.x1f4r.mmocraft.eventbus.events.PluginReloadedEvent;
 import com.x1f4r.mmocraft.persistence.PersistenceService;
 import com.x1f4r.mmocraft.persistence.SqlitePersistenceService;
+import com.x1f4r.mmocraft.playerdata.BasicPlayerDataService; // Added
+import com.x1f4r.mmocraft.playerdata.PlayerDataService; // Added
+import com.x1f4r.mmocraft.playerdata.listeners.PlayerJoinQuitListener; // Added
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -40,6 +41,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private EventBusService eventBusService;
     private PersistenceService persistenceService;
     private CommandRegistryService commandRegistryService;
+    private PlayerDataService playerDataService; // Added
     private LoggingUtil loggingUtil;
 
     /**
@@ -101,6 +103,15 @@ public final class MMOCraftPlugin extends JavaPlugin {
             // return;
         }
 
+        // Initialize PlayerDataService (depends on Persistence, Logging, EventBus)
+        playerDataService = new BasicPlayerDataService(this, persistenceService, loggingUtil, eventBusService);
+        playerDataService.initDatabaseSchema(); // Create tables if they don't exist
+
+        // Register PlayerData listeners
+        getServer().getPluginManager().registerEvents(new PlayerJoinQuitListener(playerDataService, loggingUtil), this);
+        loggingUtil.info("PlayerDataService and listeners initialized.");
+
+
         // Register a handler for PluginReloadedEvent
         if (eventBusService != null) { // Defensive check, should be initialized
             eventBusService.register(PluginReloadedEvent.class, event -> {
@@ -138,6 +149,9 @@ public final class MMOCraftPlugin extends JavaPlugin {
         }
 
         // Add any other service cleanup here in the future (e.g., eventBusService.shutdown())
+        if (playerDataService instanceof BasicPlayerDataService) { // Check instance before calling specific shutdown
+            ((BasicPlayerDataService) playerDataService).shutdown();
+        }
 
         loggingUtil.info("MMOCraft has been disabled.");
     }
@@ -178,6 +192,15 @@ public final class MMOCraftPlugin extends JavaPlugin {
      */
     public CommandRegistryService getCommandRegistryService() {
         return commandRegistryService;
+    }
+
+    /**
+     * Gets the active player data service.
+     * Used for managing player profiles and game-specific data.
+     * @return The {@link PlayerDataService} instance.
+     */
+    public PlayerDataService getPlayerDataService() { // Added
+        return playerDataService;
     }
 
     /**
