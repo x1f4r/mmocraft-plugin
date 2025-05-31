@@ -1,31 +1,34 @@
 package com.x1f4r.mmocraft.core;
 
+import com.x1f4r.mmocraft.combat.listeners.PlayerCombatListener; // Added
+import com.x1f4r.mmocraft.combat.service.BasicDamageCalculationService; // Added
+import com.x1f4r.mmocraft.combat.service.DamageCalculationService; // Added
+import com.x1f4r.mmocraft.command.BasicCommandRegistryService;
+import com.x1f4r.mmocraft.command.CommandRegistryService;
+import com.x1f4r.mmocraft.command.commands.ExecuteSkillCommand; // Added
+import com.x1f4r.mmocraft.command.commands.MMOCraftInfoCommand;
+import com.x1f4r.mmocraft.command.commands.admin.PlayerDataAdminCommand;
 import com.x1f4r.mmocraft.config.BasicConfigService;
 import com.x1f4r.mmocraft.config.ConfigService;
 import com.x1f4r.mmocraft.eventbus.BasicEventBusService;
 import com.x1f4r.mmocraft.eventbus.EventBusService;
-import com.x1f4r.mmocraft.command.BasicCommandRegistryService;
-import com.x1f4r.mmocraft.command.CommandRegistryService;
-import com.x1f4r.mmocraft.command.commands.MMOCraftInfoCommand;
-import com.x1f4r.mmocraft.eventbus.events.PluginReloadedEvent;
-import com.x1f4r.mmocraft.config.BasicConfigService;
-import com.x1f4r.mmocraft.config.ConfigService;
-import com.x1f4r.mmocraft.eventbus.BasicEventBusService;
-import com.x1f4r.mmocraft.eventbus.EventBusService;
-import com.x1f4r.mmocraft.command.BasicCommandRegistryService;
-import com.x1f4r.mmocraft.command.CommandRegistryService;
-import com.x1f4r.mmocraft.command.commands.MMOCraftInfoCommand;
 import com.x1f4r.mmocraft.eventbus.events.PluginReloadedEvent;
 import com.x1f4r.mmocraft.persistence.PersistenceService;
 import com.x1f4r.mmocraft.persistence.SqlitePersistenceService;
-import com.x1f4r.mmocraft.playerdata.BasicPlayerDataService; // Added
-import com.x1f4r.mmocraft.playerdata.PlayerDataService; // Added
-import com.x1f4r.mmocraft.playerdata.listeners.PlayerJoinQuitListener; // Added
+import com.x1f4r.mmocraft.playerdata.BasicPlayerDataService;
+import com.x1f4r.mmocraft.playerdata.PlayerDataService;
+import com.x1f4r.mmocraft.playerdata.listeners.PlayerJoinQuitListener;
+import com.x1f4r.mmocraft.skill.impl.MinorHealSkill; // Added
+import com.x1f4r.mmocraft.skill.impl.StrongStrikeSkill;
+import com.x1f4r.mmocraft.skill.service.BasicSkillRegistryService;
+import com.x1f4r.mmocraft.skill.service.SkillRegistryService;
+import com.x1f4r.mmocraft.statuseffect.manager.BasicStatusEffectManager; // Added
+import com.x1f4r.mmocraft.statuseffect.manager.StatusEffectManager; // Added
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask; // Added
 
 import java.sql.SQLException;
-// import java.util.logging.Level; // No longer needed due to LoggingUtil
 
 /**
  * Main class for the MMOCraft plugin.
@@ -41,8 +44,12 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private EventBusService eventBusService;
     private PersistenceService persistenceService;
     private CommandRegistryService commandRegistryService;
-    private PlayerDataService playerDataService; // Added
+    private PlayerDataService playerDataService;
+    private DamageCalculationService damageCalculationService;
+    private SkillRegistryService skillRegistryService;
+    private StatusEffectManager statusEffectManager; // Added
     private LoggingUtil loggingUtil;
+    private BukkitTask statusEffectTickTask; // Added
 
     /**
      * Called when the plugin is first enabled.
@@ -80,8 +87,11 @@ public final class MMOCraftPlugin extends JavaPlugin {
         // BasicCommandRegistryService constructor takes JavaPlugin and internally gets LoggingUtil from it.
         commandRegistryService = new BasicCommandRegistryService(this);
 
-        // Register commands - MMOCraftInfoCommand constructor was updated to take LoggingUtil
+        // Register commands
         commandRegistryService.registerCommand("mmoc", new MMOCraftInfoCommand(this, "mmoc", "mmocraft.command.info", "Base command for MMOCraft.", loggingUtil));
+        commandRegistryService.registerCommand("playerdata", new PlayerDataAdminCommand(this));
+        commandRegistryService.registerCommand("useskill", new ExecuteSkillCommand(this)); // Added /useskill command
+
 
         // Initialize PersistenceService
         try {
@@ -109,7 +119,33 @@ public final class MMOCraftPlugin extends JavaPlugin {
 
         // Register PlayerData listeners
         getServer().getPluginManager().registerEvents(new PlayerJoinQuitListener(playerDataService, loggingUtil), this);
-        loggingUtil.info("PlayerDataService and listeners initialized.");
+        loggingUtil.info("PlayerDataService and its listeners initialized.");
+
+        // Initialize DamageCalculationService (depends on PlayerDataService, LoggingUtil)
+        damageCalculationService = new BasicDamageCalculationService(playerDataService, loggingUtil);
+        loggingUtil.info("DamageCalculationService initialized.");
+
+        // Register Combat listeners
+        getServer().getPluginManager().registerEvents(new PlayerCombatListener(damageCalculationService, playerDataService, loggingUtil), this);
+        loggingUtil.info("Combat listeners registered.");
+
+        // Initialize SkillRegistryService
+        skillRegistryService = new BasicSkillRegistryService(loggingUtil);
+        registerSkills(); // Register implemented skills
+        loggingUtil.info("SkillRegistryService initialized and skills registered.");
+
+        // Initialize StatusEffectManager
+        statusEffectManager = new BasicStatusEffectManager(this, loggingUtil, playerDataService);
+        loggingUtil.info("StatusEffectManager initialized.");
+
+        // Start StatusEffect tick scheduler
+        long tickInterval = 20L; // 20 ticks = 1 second (Bukkit ticks)
+        statusEffectTickTask = getServer().getScheduler().runTaskTimer(this, () -> {
+            if (statusEffectManager != null) {
+                statusEffectManager.tickAllActiveEffects();
+            }
+        }, tickInterval, tickInterval);
+        loggingUtil.info("StatusEffect tick scheduler started (every " + tickInterval + " server ticks).");
 
 
         // Register a handler for PluginReloadedEvent
@@ -149,8 +185,15 @@ public final class MMOCraftPlugin extends JavaPlugin {
         }
 
         // Add any other service cleanup here in the future (e.g., eventBusService.shutdown())
-        if (playerDataService instanceof BasicPlayerDataService) { // Check instance before calling specific shutdown
+        if (playerDataService instanceof BasicPlayerDataService) {
             ((BasicPlayerDataService) playerDataService).shutdown();
+        }
+        if (statusEffectManager instanceof BasicStatusEffectManager) { // Added manager shutdown
+            ((BasicStatusEffectManager) statusEffectManager).shutdown();
+        }
+        if (statusEffectTickTask != null && !statusEffectTickTask.isCancelled()) { // Added task cancellation
+            statusEffectTickTask.cancel();
+            loggingUtil.info("StatusEffect tick scheduler cancelled.");
         }
 
         loggingUtil.info("MMOCraft has been disabled.");
@@ -199,8 +242,35 @@ public final class MMOCraftPlugin extends JavaPlugin {
      * Used for managing player profiles and game-specific data.
      * @return The {@link PlayerDataService} instance.
      */
-    public PlayerDataService getPlayerDataService() { // Added
+    public PlayerDataService getPlayerDataService() {
         return playerDataService;
+    }
+
+    /**
+     * Gets the active damage calculation service.
+     * Used for determining combat outcomes.
+     * @return The {@link DamageCalculationService} instance.
+     */
+    public DamageCalculationService getDamageCalculationService() { // Added
+        return damageCalculationService;
+    }
+
+    /**
+     * Gets the active skill registry service.
+     * Used to manage and access available skills.
+     * @return The {@link SkillRegistryService} instance.
+     */
+    public SkillRegistryService getSkillRegistryService() { // Added
+        return skillRegistryService;
+    }
+
+    /**
+     * Gets the active status effect manager.
+     * Used for applying, removing, and ticking status effects on entities.
+     * @return The {@link StatusEffectManager} instance.
+     */
+    public StatusEffectManager getStatusEffectManager() { // Added
+        return statusEffectManager;
     }
 
     /**
@@ -213,6 +283,16 @@ public final class MMOCraftPlugin extends JavaPlugin {
     }
 
     // --- Plugin Actions ---
+
+    private void registerSkills() {
+        if (skillRegistryService == null) {
+            loggingUtil.severe("SkillRegistryService not initialized. Cannot register skills.");
+            return;
+        }
+        skillRegistryService.registerSkill(new StrongStrikeSkill(this));
+        skillRegistryService.registerSkill(new MinorHealSkill(this));
+        // Add more skills here as they are implemented
+    }
 
     /**
      * Reloads the plugin's configuration.

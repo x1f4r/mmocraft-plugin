@@ -11,3 +11,12 @@ commands:
     usage: /<command> [subcommand]
     aliases: [mmo, mmocraft]
     permission: mmocraft.command.info # Optional: Base permission for the main command itself
+  playerdata:
+    description: Admin command for managing player data.
+    usage: /<command> <subcommand> [args...]
+    aliases: [pd, mmocpd]
+    permission: mmocraft.admin.playerdata # Base permission for using /pd and its subcommands
+  useskill:
+    description: Executes a learned skill.
+    usage: /<command> <skillId> [targetName]
+    permission: mmocraft.command.useskill # Permission for players to use skills via command

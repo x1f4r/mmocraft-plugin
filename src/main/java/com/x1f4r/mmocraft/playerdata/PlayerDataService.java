@@ -75,4 +75,12 @@ public interface PlayerDataService {
      * This should be called once during plugin startup.
      */
     void initDatabaseSchema();
+
+    /**
+     * Adds experience to a player's profile and handles leveling up.
+     *
+     * @param playerUUID The UUID of the player to grant experience to.
+     * @param amount The amount of experience to add. Must be positive.
+     */
+    void addExperience(UUID playerUUID, long amount);
 }

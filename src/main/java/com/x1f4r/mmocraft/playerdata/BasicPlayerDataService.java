@@ -3,12 +3,16 @@ package com.x1f4r.mmocraft.playerdata;
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.eventbus.EventBusService;
 import com.x1f4r.mmocraft.persistence.PersistenceService;
+import com.x1f4r.mmocraft.eventbus.EventBusService;
+import com.x1f4r.mmocraft.persistence.PersistenceService;
+import com.x1f4r.mmocraft.playerdata.events.PlayerLevelUpEvent; // Added
 import com.x1f4r.mmocraft.playerdata.model.PlayerProfile;
 import com.x1f4r.mmocraft.playerdata.model.Stat;
+import com.x1f4r.mmocraft.playerdata.util.ExperienceUtil; // Added
 import com.x1f4r.mmocraft.util.JsonUtil;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 
-import java.sql.ResultSet;
+// import java.sql.ResultSet; // No longer directly used in this class after refactor
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -107,21 +111,29 @@ public class BasicPlayerDataService implements PlayerDataService {
                 }, playerUUID.toString()).orElse(null);
 
                 if (profile != null) {
-                    profile.setPlayerName(playerName); // Update name in case it changed
+                    profile.setPlayerName(playerName); // Update name in case it changed with current Bukkit name
                     profile.setLastLogin(LocalDateTime.now());
+                    // Recalculate attributes based on loaded stats, in case formulas changed or it wasn't done by constructor
+                    // The PlayerProfile full constructor already calls recalculateDerivedAttributes.
+                    // If loading from DB, it uses the full constructor.
+                    // profile.recalculateDerivedAttributes(); // Ensure this is called if not by constructor
                     logger.info("Loaded profile for player: " + playerName + " (UUID: " + playerUUID + ")");
                 } else {
                     logger.info("No existing profile found for " + playerName + ". Creating new profile.");
-                    profile = new PlayerProfile(playerUUID, playerName);
-                    // Set default stats explicitly if constructor doesn't cover all desired initial values
-                    profile.setCoreStats(getDefaultStats());
-                    // Save the new profile immediately to ensure it's in the DB
-                    // This initial save can be synchronous if needed before player fully joins, or async.
-                    // For simplicity here, let's make it part of this async chain, but it's a design choice.
-                    saveProfileData(profile, true); // true for new profile
+                    profile = new PlayerProfile(playerUUID, playerName); // This constructor calls recalculateDerivedAttributes
+                    // Default stats are set by PlayerProfile constructor. If specific overrides are needed:
+                    // profile.setCoreStats(getDefaultStats()); // This would also trigger recalculate
+                    saveProfileData(profile, true); // Save the newly created profile
                 }
+                // Ensure derived attributes are up-to-date after any potential modifications or if just loaded
+                // The constructors of PlayerProfile are now responsible for the initial call.
+                // If there's a scenario where stats might be altered after construction but before caching,
+                // then an explicit call here would be a safeguard.
+                // For now, PlayerProfile constructors handle it.
+                // profile.recalculateDerivedAttributes(); // This call might be redundant if constructors do it.
+
                 cachePlayerProfile(profile);
-                // TODO: Fire PlayerProfileLoadedEvent via eventBusService
+                // TODO: Fire PlayerProfileLoadedEvent via eventBusService: eventBusService.call(new PlayerProfileLoadedEvent(profile));
                 return profile;
             } catch (SQLException e) {
                 logger.severe("Failed to load player profile for UUID: " + playerUUID, e);
@@ -233,13 +245,78 @@ public class BasicPlayerDataService implements PlayerDataService {
     @Override
     public Map<Stat, Double> getDefaultStats() {
         Map<Stat, Double> defaultStats = new EnumMap<>(Stat.class);
-        // These should match the defaults in PlayerProfile constructor or be configurable
+        // These should match the defaults in PlayerProfile constructor or be configurable via ConfigService
         for (Stat stat : Stat.values()) {
-            defaultStats.put(stat, 10.0); // Default base value
+            defaultStats.put(stat, 10.0); // Default base value for core stats
         }
-        defaultStats.put(Stat.VITALITY, 15.0); // Example: Vitality starts higher
-        // Potentially load these defaults from configService if desired
+        // Example overrides for specific stats, matching PlayerProfile's minimal constructor
+        defaultStats.put(Stat.VITALITY, 12.0);
+        defaultStats.put(Stat.WISDOM, 11.0);
         return defaultStats;
+    }
+
+    @Override
+    public void addExperience(UUID playerUUID, long amount) {
+        if (amount <= 0) {
+            logger.fine("Attempted to add non-positive XP ("+ amount +") to " + playerUUID + ". Ignoring.");
+            return;
+        }
+
+        PlayerProfile profile = getPlayerProfile(playerUUID);
+        if (profile == null) {
+            logger.warning("Cannot add experience: PlayerProfile not found in cache for UUID " + playerUUID);
+            return;
+        }
+
+        if (profile.getLevel() >= ExperienceUtil.getMaxLevel()) {
+            logger.fine("Player " + profile.getPlayerName() + " is at max level. No XP gained.");
+            profile.setExperience(0); // Clear any overflow from before reaching max level
+            return;
+        }
+
+        profile.setExperience(profile.getExperience() + amount);
+        logger.fine("Added " + amount + " XP to " + profile.getPlayerName() + ". Current XP: " + profile.getExperience());
+
+        boolean leveledUp = false;
+        while (profile.getExperience() >= profile.getExperienceToNextLevel() && profile.getLevel() < ExperienceUtil.getMaxLevel()) {
+            long xpForOldLevel = profile.getExperienceToNextLevel(); // XP needed for the level just completed
+            profile.setExperience(profile.getExperience() - xpForOldLevel);
+
+            int oldLevel = profile.getLevel();
+            profile.setLevel(oldLevel + 1); // setLevel calls recalculateDerivedAttributes
+            leveledUp = true;
+
+            logger.info(profile.getPlayerName() + " leveled up to level " + profile.getLevel() + "!");
+
+            // Create a snapshot for the event. For simplicity, this is the current profile state.
+            // A true snapshot might involve deep copying if PlayerProfile is highly mutable
+            // or if listeners might modify the profile passed in an event.
+            PlayerProfile snapshot = new PlayerProfile(
+                profile.getPlayerUUID(), profile.getPlayerName(), profile.getCurrentHealth(), profile.getMaxHealth(),
+                profile.getCurrentMana(), profile.getMaxMana(), profile.getLevel(), // Use new level in snapshot
+                profile.getExperience(), profile.getCurrency(), profile.getCoreStats(), // Pass copy of stats
+                profile.getFirstLogin(), profile.getLastLogin()
+            );
+
+            eventBusService.call(new PlayerLevelUpEvent(profile.getPlayerUUID(), oldLevel, profile.getLevel(), snapshot));
+
+            if (profile.getLevel() >= ExperienceUtil.getMaxLevel()) {
+                logger.info(profile.getPlayerName() + " reached MAX LEVEL (" + ExperienceUtil.getMaxLevel() + ")!");
+                profile.setExperience(0); // Set XP to 0 at max level
+                break;
+            }
+        }
+        // Ensure experience doesn't become negative if somehow 'getExperienceToNextLevel' was greater than current XP
+        // though the loop condition should prevent this.
+        if (profile.getExperience() < 0) {
+            profile.setExperience(0);
+        }
+
+        if (leveledUp) {
+            logger.fine(profile.getPlayerName() + " final state after leveling: Level " + profile.getLevel() + ", XP " + profile.getExperience());
+            // Consider saving player profile after level up if desired immediately
+            // savePlayerProfile(playerUUID); // This would make it async
+        }
     }
 
     // Call this method on plugin disable to ensure all tasks are completed.
