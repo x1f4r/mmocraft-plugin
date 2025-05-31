@@ -4,3 +4,10 @@ main: com.x1f4r.mmocraft.core.MMOCraftPlugin
 api-version: "1.21"
 website: "https://github.com/x1f4r/mmocraft-plugin"
 description: "MMO Engine plugin for Purpur"
+
+commands:
+  mmoc:
+    description: Base command for MMOCraft.
+    usage: /<command> [subcommand]
+    aliases: [mmo, mmocraft]
+    permission: mmocraft.command.info # Optional: Base permission for the main command itself
