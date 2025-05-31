@@ -1,0 +1,6 @@
+name: MMOCraft
+version: 0.1.0-SNAPSHOT
+main: com.x1f4r.mmocraft.core.MMOCraftPlugin
+api-version: "1.21"
+website: "https://github.com/x1f4r/mmocraft-plugin"
+description: "MMO Engine plugin for Purpur"

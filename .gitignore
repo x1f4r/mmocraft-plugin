@@ -1,0 +1,14 @@
+# Gradle & Java
+.gradle/
+build/
+out/
+!gradle/wrapper/gradle-wrapper.jar
+*.class
+*.jar
+*.log
+# IDEs
+.idea/
+*.iml
+.vscode/
+# OS cruft
+.DS_Store
