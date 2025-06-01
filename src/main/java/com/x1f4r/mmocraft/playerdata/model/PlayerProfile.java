@@ -1,13 +1,12 @@
 package com.x1f4r.mmocraft.playerdata.model;
 
-import java.time.LocalDateTime;
-import com.x1f4r.mmocraft.playerdata.util.ExperienceUtil; // Added for leveling
+import com.x1f4r.mmocraft.playerdata.util.ExperienceUtil;
 import java.time.LocalDateTime;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap; // Added for skillCooldowns
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -39,7 +38,10 @@ public class PlayerProfile {
     // private long totalPlaytimeSeconds;
 
     // --- Skill Cooldowns ---
-    private final Map<String, Long> skillCooldowns = new ConcurrentHashMap<>(); // skillId to cooldownExpiryTimeMillis
+    private final Map<String, Long> skillCooldowns = new ConcurrentHashMap<>();
+
+    // --- Equipment Stat Modifiers ---
+    private final Map<Stat, Double> equipmentStatModifiers = new EnumMap<>(Stat.class); // Added
 
     // --- Derived Secondary Stats ---
     private double criticalHitChance;
@@ -149,8 +151,28 @@ public class PlayerProfile {
     public int getLevel() { return level; }
     public long getExperience() { return experience; }
     public long getCurrency() { return currency; }
-    public Map<Stat, Double> getCoreStats() { return new EnumMap<>(coreStats); } // Return a copy for encapsulation
-    public Double getStatValue(Stat stat) { return coreStats.getOrDefault(stat, 0.0); }
+    public Map<Stat, Double> getCoreStats() { return new EnumMap<>(coreStats); } // Returns base stats
+
+    /**
+     * Gets the base value of a core stat (before equipment or other temporary modifiers).
+     * @param stat The stat to retrieve.
+     * @return The base value of the stat, or 0.0 if not set (though usually all stats are initialized).
+     */
+    public Double getBaseStatValue(Stat stat) {
+        return coreStats.getOrDefault(stat, 0.0); // Assuming 0.0 as a hard default if a stat was somehow missed
+    }
+
+    /**
+     * Gets the total value of a core stat, including base value and equipment modifiers.
+     * This is the value that should be used for most game calculations (e.g., damage, derived attributes).
+     * @param stat The stat to retrieve.
+     * @return The effective value of the stat.
+     */
+    public Double getStatValue(Stat stat) {
+        return getBaseStatValue(stat) + getEquipmentStatModifier(stat);
+        // Future: + getTemporaryStatusEffectModifier(stat);
+    }
+
     public LocalDateTime getFirstLogin() { return firstLogin; }
     public LocalDateTime getLastLogin() { return lastLogin; }
 
@@ -186,16 +208,60 @@ public class PlayerProfile {
         recalculateDerivedAttributes();
     }
     public void setStatValue(Stat stat, double value) {
-        this.coreStats.put(Objects.requireNonNull(stat), Math.max(0, value));
-        recalculateDerivedAttributes(); // Core stat change triggers recalculation
+        this.coreStats.put(Objects.requireNonNull(stat), Math.max(0, value)); // Modifies BASE stat
+        recalculateDerivedAttributes();
     }
 
     // No setter for firstLogin as it should be immutable after creation
     public void setLastLogin(LocalDateTime lastLogin) { this.lastLogin = Objects.requireNonNull(lastLogin); }
 
+    // --- Equipment Stat Modifier Methods ---
+
+    /** Clears all temporary stat modifiers from equipment. Does NOT recalculate derived attributes. */
+    public void clearEquipmentStatModifiers() {
+        // boolean changed = !equipmentStatModifiers.isEmpty(); // Recalculate will be called by manager
+        equipmentStatModifiers.clear();
+        // if (changed) {
+        //     recalculateDerivedAttributes(); // Manager will call this
+        // }
+    }
+
+    /**
+     * Adds a value to an equipment-based stat modifier.
+     * @param stat The stat to modify.
+     * @param value The value to add (can be negative).
+     */
+    public void addEquipmentStatModifier(Stat stat, double value) {
+        equipmentStatModifiers.merge(Objects.requireNonNull(stat), value, Double::sum);
+        // recalculateDerivedAttributes(); // Manager will call this
+    }
+
+    /**
+     * Adds all modifiers from the given map to the equipment stat modifiers.
+     * Does NOT recalculate derived attributes; caller (PlayerEquipmentManager) is responsible.
+     * @param modifiers A map of stats and their values to add.
+     */
+    public void addAllEquipmentStatModifiers(Map<Stat, Double> modifiers) {
+        if (modifiers == null || modifiers.isEmpty()) {
+            return;
+        }
+        modifiers.forEach((stat, value) -> equipmentStatModifiers.merge(stat, value, Double::sum));
+        // recalculateDerivedAttributes(); // Manager will call this once at the end
+    }
+
+    /**
+     * Gets the total modifier value for a specific stat from all equipment.
+     * @param stat The stat.
+     * @return The total modifier value, or 0.0 if no modifier exists for that stat.
+     */
+    public double getEquipmentStatModifier(Stat stat) {
+        return equipmentStatModifiers.getOrDefault(Objects.requireNonNull(stat), 0.0);
+    }
+
+
     /**
      * Recalculates derived attributes like max health, max mana, critical hit chance, etc.,
-     * based on current core stats and level. This should be called whenever a core stat
+     * based on current core stats (including equipment modifiers) and level. This should be called whenever a core stat
      * or the player's level changes, or when the profile is loaded.
      */
     public void recalculateDerivedAttributes() {
@@ -292,9 +358,16 @@ public class PlayerProfile {
         return Math.max(0, remaining);
     }
 
-    public void takeDamage(long amount) {
+    /**
+     * Reduces the player's current health by the given amount.
+     * Ensures health does not drop below 0.
+     * This method is for internal record-keeping; actual damage application to Bukkit entity
+     * is handled by systems interacting with Bukkit's damage events.
+     * @param amount The amount of damage to take.
+     */
+    public void takeDamage(double amount) { // Changed to double to match DamageInstance.finalDamage
         if (amount <= 0) return;
-        setCurrentHealth(this.currentHealth - amount);
+        setCurrentHealth(this.currentHealth - (long)Math.ceil(amount)); // Apply damage, ensuring it's at least 1 if amount > 0
     }
 
     public void heal(long amount) {

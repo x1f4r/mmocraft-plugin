@@ -3,7 +3,9 @@ package com.x1f4r.mmocraft.combat.listeners;
 import com.x1f4r.mmocraft.combat.model.DamageInstance;
 import com.x1f4r.mmocraft.combat.model.DamageType;
 import com.x1f4r.mmocraft.combat.service.DamageCalculationService;
+import com.x1f4r.mmocraft.combat.service.MobStatProvider; // Added
 import com.x1f4r.mmocraft.playerdata.PlayerDataService;
+import com.x1f4r.mmocraft.playerdata.model.PlayerProfile; // Added for victim profile update test
 import com.x1f4r.mmocraft.util.LoggingUtil;
 
 import org.bukkit.Material;
@@ -31,8 +33,9 @@ import static org.mockito.Mockito.*;
 class PlayerCombatListenerTest {
 
     @Mock private DamageCalculationService mockDamageCalcService;
-    @Mock private PlayerDataService mockPlayerDataService; // Not directly used by listener methods but part of context
+    @Mock private PlayerDataService mockPlayerDataService;
     @Mock private LoggingUtil mockLogger;
+    @Mock private MobStatProvider mockMobStatProvider; // Added
 
     @Mock private Player mockAttackerPlayer;
     @Mock private PlayerInventory mockPlayerInventory;
@@ -50,7 +53,7 @@ class PlayerCombatListenerTest {
 
     @BeforeEach
     void setUp() {
-        listener = new PlayerCombatListener(mockDamageCalcService, mockPlayerDataService, mockLogger);
+        listener = new PlayerCombatListener(mockDamageCalcService, mockPlayerDataService, mockLogger, mockMobStatProvider); // Added mockMobStatProvider
 
         // Common event mocks
         when(mockEvent.getEntity()).thenReturn(mockVictimLivingEntity);
@@ -101,16 +104,22 @@ class PlayerCombatListenerTest {
     }
 
     @Test
-    void onEntityDamageByEntity_zombieAttacks_usesMobDefaultDamage() {
-        setupMobAttacker(EntityType.ZOMBIE, 3.0); // Bukkit says 3.0 damage
-        DamageInstance fakeDamageInstance = new DamageInstance(mockEvent.getDamager(), mockVictimLivingEntity, 3.0, DamageType.PHYSICAL, false,false, "", 2.0);
-         when(mockDamageCalcService.calculateDamage(any(Entity.class), any(Entity.class), baseDamageCaptor.capture(), any(DamageType.class)))
+    void onEntityDamageByEntity_zombieAttacks_usesMobStatProviderDamage() {
+        LivingEntity mobAttacker = mock(LivingEntity.class);
+        when(mobAttacker.getType()).thenReturn(EntityType.ZOMBIE);
+        when(mockEvent.getDamager()).thenReturn(mobAttacker);
+        // when(mockEvent.getDamage()).thenReturn(3.0); // This would be Bukkit's original, we override with MobStatProvider
+
+        when(mockMobStatProvider.getBaseAttackDamage(EntityType.ZOMBIE)).thenReturn(5.0); // Custom base damage
+
+        DamageInstance fakeDamageInstance = new DamageInstance(mobAttacker, mockVictimLivingEntity, 5.0, DamageType.PHYSICAL, false,false, "", 4.0);
+        when(mockDamageCalcService.calculateDamage(eq(mobAttacker), eq(mockVictimLivingEntity), baseDamageCaptor.capture(), any(DamageType.class)))
             .thenReturn(fakeDamageInstance);
 
         listener.onEntityDamageByEntity(mockEvent);
 
-        assertEquals(3.0, baseDamageCaptor.getValue(), 0.01, "Base damage for Zombie should be its default.");
-        verify(mockEvent).setDamage(2.0);
+        assertEquals(5.0, baseDamageCaptor.getValue(), 0.01, "Base damage for Zombie should be from MobStatProvider.");
+        verify(mockEvent).setDamage(4.0);
     }
 
     @Test
@@ -165,7 +174,32 @@ class PlayerCombatListenerTest {
 
         // If victim or attacker is a player, check for action bar message (optional, needs Player mock)
         if (mockVictimLivingEntity instanceof Player) {
-            verify((Player)mockVictimLivingEntity, times(1)).sendActionBar(anyString());
+            // verify((Player)mockVictimLivingEntity, times(1)).sendActionBar(anyString()); // sendActionBar is in DamageInstance now
         }
+    }
+
+    @Test
+    void onEntityDamageByEntity_playerVictim_profileHealthUpdated() {
+        setupPlayerAttackerWithWeapon(Material.STONE_SWORD); // Base damage 5.0
+        Player mockVictimAsPlayer = mock(Player.class); // Specific Player mock for victim
+        PlayerProfile mockVictimPlayerProfile = mock(PlayerProfile.class);
+
+        when(mockEvent.getEntity()).thenReturn(mockVictimAsPlayer); // Override general victim with Player victim
+        when(mockVictimAsPlayer.getUniqueId()).thenReturn(UUID.randomUUID());
+        when(mockPlayerDataService.getPlayerProfile(mockVictimAsPlayer.getUniqueId())).thenReturn(mockVictimPlayerProfile);
+
+
+        DamageInstance damageDone = new DamageInstance(
+            mockAttackerPlayer, mockVictimAsPlayer, 5.0, DamageType.PHYSICAL,
+            false, false, "", 3.5 // Final damage after calculations
+        );
+        when(mockDamageCalcService.calculateDamage(any(), eq(mockVictimAsPlayer), anyDouble(), any())).thenReturn(damageDone);
+
+        listener.onEntityDamageByEntity(mockEvent);
+
+        verify(mockEvent).setDamage(3.5);
+        verify(mockVictimPlayerProfile).takeDamage(3.5); // Check if PlayerProfile.takeDamage was called
+        verify(mockLogger).info(contains("hit"));
+        verify(mockLogger).fine(contains("Updated PlayerProfile health for"));
     }
 }

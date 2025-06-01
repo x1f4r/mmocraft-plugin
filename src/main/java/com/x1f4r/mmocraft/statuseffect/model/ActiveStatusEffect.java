@@ -1,5 +1,7 @@
 package com.x1f4r.mmocraft.statuseffect.model;
 
+import java.time.LocalDateTime; // Added
+import java.time.ZoneOffset;    // Added
 import java.util.UUID;
 import java.util.Objects;
 

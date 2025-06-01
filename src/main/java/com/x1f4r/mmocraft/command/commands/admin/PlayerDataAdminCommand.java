@@ -10,15 +10,16 @@ import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
+// import java.util.ArrayList; // Unused
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
+import java.util.Map; // Required for Map.Entry
+// import java.util.UUID; // Unused
+// import org.bukkit.OfflinePlayer; // Unused
 import java.util.stream.Collectors;
 
 public class PlayerDataAdminCommand extends AbstractPluginCommand {

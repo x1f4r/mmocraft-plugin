@@ -67,8 +67,8 @@ public class BasicEventBusService implements EventBusService {
                 }
             }
              // Move to the superclass to support polymorphic event handling
-            eventType = eventType.getSuperclass();
-            if (eventType == Object.class) break; // Stop before reaching Object
+            currentEventType = currentEventType.getSuperclass(); // Corrected variable name
+            if (currentEventType == Object.class || currentEventType == null) break; // Stop before reaching Object or if no superclass
         }
     }
 }

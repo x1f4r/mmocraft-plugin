@@ -19,20 +19,23 @@ public class BasicDamageCalculationService implements DamageCalculationService {
 
     private final PlayerDataService playerDataService;
     private final LoggingUtil logger;
+    private final MobStatProvider mobStatProvider; // Added
     private final Random random = new Random();
 
     // Example scaling factors (could be moved to config or PlayerProfile constants)
-    private static final double STRENGTH_DAMAGE_SCALING_PHYSICAL = 0.5; // Extra damage per point of STR
-    private static final double INTELLIGENCE_DAMAGE_SCALING_MAGICAL = 0.7; // Extra damage per point of INT
+    private static final double STRENGTH_DAMAGE_SCALING_PHYSICAL = 0.5;
+    private static final double INTELLIGENCE_DAMAGE_SCALING_MAGICAL = 0.7;
+    private static final double MOB_DEFENSE_REDUCTION_FACTOR = 0.04; // 4% damage reduction per defense point
 
-    public BasicDamageCalculationService(PlayerDataService playerDataService, LoggingUtil logger) {
+    public BasicDamageCalculationService(PlayerDataService playerDataService, LoggingUtil logger, MobStatProvider mobStatProvider) { // Added mobStatProvider
         this.playerDataService = playerDataService;
         this.logger = logger;
-        logger.debug("BasicDamageCalculationService initialized.");
+        this.mobStatProvider = mobStatProvider; // Added
+        logger.debug("BasicDamageCalculationService initialized with MobStatProvider.");
     }
 
     @Override
-    public DamageInstance calculateDamage(Entity attacker, Entity victim, double baseWeaponDamage, DamageType damageType) {
+    public DamageInstance calculateDamage(Entity attacker, Entity victim, double initialBaseDamage, DamageType damageType) {
         Entity actualAttacker = attacker;
         // Resolve actual attacker if it's a projectile
         if (attacker instanceof Projectile projectile) {
@@ -46,80 +49,90 @@ public class BasicDamageCalculationService implements DamageCalculationService {
         UUID victimId = victim.getUniqueId();
 
         PlayerProfile attackerProfile = null;
-        if (actualAttacker instanceof Player) {
-            attackerProfile = playerDataService.getPlayerProfile(attackerId);
-        }
-
         PlayerProfile victimProfile = null;
-        if (victim instanceof Player) {
-            victimProfile = playerDataService.getPlayerProfile(victimId);
+        double currentDamage = initialBaseDamage; // Start with the raw damage passed in
+
+        if (actualAttacker instanceof Player pAttacker) {
+            attackerProfile = playerDataService.getPlayerProfile(attackerId);
+            if (attackerProfile == null) {
+                 logger.warning("Attacker Player " + pAttacker.getName() + " has no PlayerProfile in cache. Using raw damage.");
+            }
+        } else if (actualAttacker instanceof LivingEntity) {
+            // Attacker is a Mob. Use MobStatProvider for its base attack if initialBaseDamage wasn't already set by listener from it.
+            // The listener now sets initialBaseDamage from MobStatProvider, so we don't need to re-fetch here.
+            // currentDamage is already mob's base attack.
         }
 
-        // If profiles are null (e.g. mob, or player data not loaded), they won't contribute stats.
-        // This is handled by getStatValue defaulting to 0 if profile is null or stat not present.
 
-        double currentDamage = baseWeaponDamage;
+        if (victim instanceof Player pVictim) {
+            victimProfile = playerDataService.getPlayerProfile(victimId);
+            if (victimProfile == null) {
+                logger.warning("Victim Player " + pVictim.getName() + " has no PlayerProfile in cache. Will take damage without profile-based mitigation.");
+            }
+        }
+
         boolean isCriticalHit = false;
         boolean isEvaded = false;
         String mitigationDetailsLog = "";
 
 
-        // 1. Apply Attacker's Offensive Bonuses (if attacker is Player with profile)
-        if (attackerProfile != null) {
+        // 1. Apply Attacker's Offensive Bonuses
+        if (attackerProfile != null) { // Attacker is Player with profile
             if (damageType == DamageType.PHYSICAL) {
                 currentDamage += attackerProfile.getStatValue(Stat.STRENGTH) * STRENGTH_DAMAGE_SCALING_PHYSICAL;
             } else if (damageType == DamageType.MAGICAL) {
                 currentDamage += attackerProfile.getStatValue(Stat.INTELLIGENCE) * INTELLIGENCE_DAMAGE_SCALING_MAGICAL;
             }
-            // Could add more complex scaling here based on other stats or buffs
-
-            // Critical Hit Check
+            // Critical Hit Check for players
             if (random.nextDouble() < attackerProfile.getCriticalHitChance()) {
                 isCriticalHit = true;
                 currentDamage *= attackerProfile.getCriticalDamageBonus();
             }
-        } else if (actualAttacker instanceof LivingEntity && !(actualAttacker instanceof Player)) {
-            // Basic Mob Damage (baseWeaponDamage is already their configured damage)
-            // Mobs could have implicit crit chance/damage later
         }
+        // Note: Mobs currently don't have offensive stat scaling or crits in this basic system.
+        // Their `initialBaseDamage` (from MobStatProvider via listener) is their full base hit.
 
-
-        double damageBeforeMitigation = currentDamage;
+        double damageAfterOffensiveBonuses = currentDamage; // This is what DamageInstance will store as 'baseDamage'
 
         // 2. Apply Victim's Defensive Capabilities
+        // Evasion Check (Players only for now)
         if (victimProfile != null) {
-            // Evasion Check (should ideally happen before resource-intensive calculations)
             if (random.nextDouble() < victimProfile.getEvasionChance()) {
                 isEvaded = true;
                 currentDamage = 0;
                 mitigationDetailsLog += "Evaded. ";
             }
+        }
+        // No evasion for mobs yet.
 
-            if (!isEvaded && damageType != DamageType.TRUE) { // True damage bypasses reductions
+        // Damage Reduction
+        if (!isEvaded && damageType != DamageType.TRUE) {
+            if (victimProfile != null) { // Victim is Player with profile
                 double reductionPercent = 0;
                 if (damageType == DamageType.PHYSICAL) {
                     reductionPercent = victimProfile.getPhysicalDamageReduction();
-                    mitigationDetailsLog += String.format("PhysReduc:%.1f%%. ", reductionPercent * 100);
+                    mitigationDetailsLog += String.format("P.Reduc:%.1f%%. ", reductionPercent * 100);
                 } else if (damageType == DamageType.MAGICAL) {
                     reductionPercent = victimProfile.getMagicDamageReduction();
-                    mitigationDetailsLog += String.format("MagReduc:%.1f%%. ", reductionPercent * 100);
+                    mitigationDetailsLog += String.format("M.Reduc:%.1f%%. ", reductionPercent * 100);
                 }
                 currentDamage *= (1.0 - reductionPercent);
+            } else if (victim instanceof LivingEntity && !(victim instanceof Player)) { // Victim is a Mob
+                double mobDefense = mobStatProvider.getBaseDefense(victim.getType());
+                double mobReduction = Math.min(0.95, mobDefense * MOB_DEFENSE_REDUCTION_FACTOR); // Cap reduction at 95%
+                mitigationDetailsLog += String.format("MobDefReduc:%.1f%% (Def:%.0f). ", mobReduction * 100, mobDefense);
+                currentDamage *= (1.0 - mobReduction);
             }
-        } else if (victim instanceof LivingEntity && !(victim instanceof Player) && !isEvaded && damageType != DamageType.TRUE) {
-            // Basic Mob Defense (e.g. some mobs might have default armor values)
-            // For now, assume mobs take full damage after attacker bonuses unless specific logic is added.
         }
 
-        // Ensure damage is not negative
-        double finalDamage = Math.max(0, currentDamage);
-        if (isEvaded) finalDamage = 0; // Ensure final damage is 0 if evaded
+        double finalDamage = Math.max(0, currentDamage); // Ensure damage is not negative
+        if (isEvaded) finalDamage = 0;
 
         return new DamageInstance(
                 actualAttacker, victim,
                 attackerId, victimId,
                 attackerProfile, victimProfile,
-                damageBeforeMitigation, // Base damage for DamageInstance means after offensive scaling but before mitigation
+                damageAfterOffensiveBonuses, // Store damage after attacker's bonuses as 'base' for the instance
                 damageType,
                 isCriticalHit,
                 isEvaded,
