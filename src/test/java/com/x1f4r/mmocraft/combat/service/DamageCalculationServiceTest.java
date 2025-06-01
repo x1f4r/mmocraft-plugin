@@ -7,10 +7,11 @@ import com.x1f4r.mmocraft.playerdata.model.PlayerProfile;
 import com.x1f4r.mmocraft.playerdata.model.Stat;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 
-import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType; // Added for mob type
+import org.bukkit.entity.Entity; // Re-adding, as it's used for parameters
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.Arrow; // For projectile testing
+import org.bukkit.entity.Arrow;
 import org.bukkit.projectiles.ProjectileSource; // For projectile testing
 
 import org.junit.jupiter.api.BeforeEach;
@@ -29,17 +30,17 @@ class DamageCalculationServiceTest {
 
     @Mock private PlayerDataService mockPlayerDataService;
     @Mock private LoggingUtil mockLogger;
+    @Mock private MobStatProvider mockMobStatProvider; // Added
 
     @Mock private Player mockAttackerPlayer;
     @Mock private PlayerProfile mockAttackerProfile;
     @Mock private Player mockVictimPlayer;
     @Mock private PlayerProfile mockVictimProfile;
-    @Mock private LivingEntity mockMobAttacker; // Generic mob
-    @Mock private LivingEntity mockMobVictim;   // Generic mob
-    @Mock private Arrow mockArrow; // For projectile testing
-    @Mock private Player mockProjectileShooterPlayer; // Player shooting a projectile
+    @Mock private LivingEntity mockMobAttacker;
+    @Mock private LivingEntity mockMobVictim;
+    @Mock private Arrow mockArrow;
+    @Mock private Player mockProjectileShooterPlayer;
     @Mock private PlayerProfile mockProjectileShooterProfile;
-
 
     private BasicDamageCalculationService damageCalcService;
 
@@ -50,7 +51,7 @@ class DamageCalculationServiceTest {
 
     @BeforeEach
     void setUp() {
-        damageCalcService = new BasicDamageCalculationService(mockPlayerDataService, mockLogger);
+        damageCalcService = new BasicDamageCalculationService(mockPlayerDataService, mockLogger, mockMobStatProvider); // Added mockMobStatProvider
 
         // Setup common player/profile mocks
         when(mockAttackerPlayer.getUniqueId()).thenReturn(attackerPlayerUUID);
@@ -144,28 +145,32 @@ class DamageCalculationServiceTest {
     }
 
     @Test
-    void calculateDamage_mobVsPlayer_noSpecialStatsForMob() {
-        // Mob attacker, no profile
+    void calculateDamage_mobVsPlayer_appliesPlayerDefense() {
+        // Mob attacker, their base damage is taken from initialBaseDamage (set by listener from MobStatProvider)
+        double mobRawDamage = 8.0;
         when(mockVictimProfile.getEvasionChance()).thenReturn(0.0);
         when(mockVictimProfile.getPhysicalDamageReduction()).thenReturn(0.25); // 25% reduction
 
-        double mobBaseDamage = 8.0;
-        DamageInstance result = damageCalcService.calculateDamage(mockMobAttacker, mockVictimPlayer, mobBaseDamage, DamageType.PHYSICAL);
+        DamageInstance result = damageCalcService.calculateDamage(mockMobAttacker, mockVictimPlayer, mobRawDamage, DamageType.PHYSICAL);
 
-        assertNull(result.attackerProfile());
+        assertNull(result.attackerProfile()); // Mob attacker has no profile
         assertEquals(mockVictimProfile, result.victimProfile());
-        assertFalse(result.criticalHit()); // Mobs don't crit by default in this service
+        assertFalse(result.criticalHit()); // Mobs don't crit here
         assertFalse(result.evaded());
-        assertEquals(mobBaseDamage, result.baseDamage(), 0.01); // Mob base damage is unchanged by stats
+        assertEquals(mobRawDamage, result.baseDamage(), 0.01); // Mob base damage is passed directly
 
-        double expectedFinalDamage = mobBaseDamage * (1.0 - 0.25); // 8.0 * 0.75 = 6.0
+        double expectedFinalDamage = mobRawDamage * (1.0 - 0.25); // 8.0 * 0.75 = 6.0
         assertEquals(expectedFinalDamage, result.finalDamage(), 0.01);
     }
 
     @Test
-    void calculateDamage_playerVsMob_noSpecialStatsForMobVictim() {
+    void calculateDamage_playerVsMob_appliesMobDefense() {
         when(mockAttackerProfile.getStatValue(Stat.STRENGTH)).thenReturn(15.0); // 15 * 0.5 = 7.5 bonus
         when(mockAttackerProfile.getCriticalHitChance()).thenReturn(0.0);
+
+        when(mockMobVictim.getType()).thenReturn(EntityType.ZOMBIE); // For MobStatProvider lookup
+        when(mockMobStatProvider.getBaseDefense(EntityType.ZOMBIE)).thenReturn(5.0); // e.g. 5 defense points
+        // 5 * 0.04 = 0.20 (20% reduction)
 
         double baseWeaponDamage = 12.0;
         DamageInstance result = damageCalcService.calculateDamage(mockAttackerPlayer, mockMobVictim, baseWeaponDamage, DamageType.PHYSICAL);
@@ -173,9 +178,29 @@ class DamageCalculationServiceTest {
         assertEquals(mockAttackerProfile, result.attackerProfile());
         assertNull(result.victimProfile()); // Mob victim has no profile
 
-        double expectedDamage = baseWeaponDamage + (15.0 * 0.5); // 12 + 7.5 = 19.5
-        assertEquals(expectedDamage, result.baseDamage(), 0.01);
-        assertEquals(expectedDamage, result.finalDamage(), 0.01); // Mob takes full damage after attacker bonuses
+        double damageAfterPlayerStats = baseWeaponDamage + (15.0 * 0.5); // 12 + 7.5 = 19.5
+        assertEquals(damageAfterPlayerStats, result.baseDamage(), 0.01);
+
+        double expectedFinalDamage = damageAfterPlayerStats * (1.0 - (5.0 * 0.04)); // 19.5 * 0.8 = 15.6
+        assertEquals(expectedFinalDamage, result.finalDamage(), 0.01);
+    }
+
+    @Test
+    void calculateDamage_mobVsMob() {
+        // Attacker mob's damage is passed as initialBaseDamage
+        double attackerMobRawDamage = 10.0;
+
+        // Victim mob's defense
+        when(mockMobVictim.getType()).thenReturn(EntityType.SKELETON);
+        when(mockMobStatProvider.getBaseDefense(EntityType.SKELETON)).thenReturn(2.0); // 2 * 0.04 = 8% reduction
+
+        DamageInstance result = damageCalcService.calculateDamage(mockMobAttacker, mockMobVictim, attackerMobRawDamage, DamageType.PHYSICAL);
+
+        assertNull(result.attackerProfile());
+        assertNull(result.victimProfile());
+        assertEquals(attackerMobRawDamage, result.baseDamage(), 0.01);
+        double expectedFinalDamage = attackerMobRawDamage * (1.0 - (2.0 * 0.04)); // 10 * (1 - 0.08) = 10 * 0.92 = 9.2
+        assertEquals(expectedFinalDamage, result.finalDamage(), 0.01);
     }
 
     @Test

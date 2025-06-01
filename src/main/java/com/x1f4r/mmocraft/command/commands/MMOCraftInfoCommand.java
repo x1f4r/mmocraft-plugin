@@ -7,7 +7,7 @@ import com.x1f4r.mmocraft.util.StringUtil; // Added
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.Arrays; // Keep if used, for now it's not.
+// import java.util.Arrays; // Keep if used, for now it's not. // Now confirmed unused
 import java.util.Collections;
 import java.util.List;
 

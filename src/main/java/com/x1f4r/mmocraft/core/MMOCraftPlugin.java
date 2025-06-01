@@ -1,43 +1,71 @@
 package com.x1f4r.mmocraft.core;
 
-import com.x1f4r.mmocraft.combat.listeners.PlayerCombatListener; // Added
-import com.x1f4r.mmocraft.combat.service.BasicDamageCalculationService; // Added
-import com.x1f4r.mmocraft.combat.service.DamageCalculationService; // Added
+import com.x1f4r.mmocraft.combat.listeners.PlayerCombatListener;
+import com.x1f4r.mmocraft.combat.service.BasicDamageCalculationService;
+import com.x1f4r.mmocraft.combat.service.DamageCalculationService;
+import com.x1f4r.mmocraft.combat.service.DefaultMobStatProvider;
+import com.x1f4r.mmocraft.combat.service.MobStatProvider;
 import com.x1f4r.mmocraft.command.BasicCommandRegistryService;
 import com.x1f4r.mmocraft.command.CommandRegistryService;
-import com.x1f4r.mmocraft.command.commands.ExecuteSkillCommand; // Added
+import com.x1f4r.mmocraft.command.commands.CustomCraftCommand;
+import com.x1f4r.mmocraft.command.commands.ExecuteSkillCommand;
 import com.x1f4r.mmocraft.command.commands.MMOCraftInfoCommand;
-import com.x1f4r.mmocraft.command.commands.admin.PlayerDataAdminCommand;
+import com.x1f4r.mmocraft.command.commands.admin.MMOCAdminRootCommand;
 import com.x1f4r.mmocraft.config.BasicConfigService;
 import com.x1f4r.mmocraft.config.ConfigService;
+import com.x1f4r.mmocraft.crafting.service.BasicRecipeRegistryService;
+import com.x1f4r.mmocraft.crafting.service.RecipeRegistryService;
+import com.x1f4r.mmocraft.crafting.ui.CraftingUIManager;
 import com.x1f4r.mmocraft.eventbus.BasicEventBusService;
 import com.x1f4r.mmocraft.eventbus.EventBusService;
 import com.x1f4r.mmocraft.eventbus.events.PluginReloadedEvent;
+import com.x1f4r.mmocraft.item.equipment.listeners.PlayerEquipmentListener;
+import com.x1f4r.mmocraft.item.equipment.service.PlayerEquipmentManager;
+import com.x1f4r.mmocraft.item.impl.SimpleSword;
+import com.x1f4r.mmocraft.item.impl.TrainingArmor;
+import com.x1f4r.mmocraft.item.service.BasicCustomItemRegistry;
+import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
+import com.x1f4r.mmocraft.loot.listeners.MobDeathLootListener;
+import com.x1f4r.mmocraft.loot.model.LootTable;
+import com.x1f4r.mmocraft.loot.model.LootTableEntry;
+import com.x1f4r.mmocraft.loot.service.BasicLootService;
+import com.x1f4r.mmocraft.loot.service.LootService;
 import com.x1f4r.mmocraft.persistence.PersistenceService;
 import com.x1f4r.mmocraft.persistence.SqlitePersistenceService;
 import com.x1f4r.mmocraft.playerdata.BasicPlayerDataService;
 import com.x1f4r.mmocraft.playerdata.PlayerDataService;
 import com.x1f4r.mmocraft.playerdata.listeners.PlayerJoinQuitListener;
-import com.x1f4r.mmocraft.skill.impl.MinorHealSkill; // Added
+import com.x1f4r.mmocraft.skill.impl.MinorHealSkill;
 import com.x1f4r.mmocraft.skill.impl.StrongStrikeSkill;
 import com.x1f4r.mmocraft.skill.service.BasicSkillRegistryService;
 import com.x1f4r.mmocraft.skill.service.SkillRegistryService;
-import com.x1f4r.mmocraft.statuseffect.manager.BasicStatusEffectManager; // Added
-import com.x1f4r.mmocraft.statuseffect.manager.StatusEffectManager; // Added
+import com.x1f4r.mmocraft.statuseffect.manager.BasicStatusEffectManager;
+import com.x1f4r.mmocraft.statuseffect.manager.StatusEffectManager;
 import com.x1f4r.mmocraft.util.LoggingUtil;
+import com.x1f4r.mmocraft.world.spawning.service.BasicCustomSpawningService;
+import com.x1f4r.mmocraft.world.spawning.service.CustomSpawningService;
+import com.x1f4r.mmocraft.world.zone.listeners.PlayerZoneTrackerListener;
+import com.x1f4r.mmocraft.world.zone.model.Zone;
+import com.x1f4r.mmocraft.world.zone.service.BasicZoneManager;
+import com.x1f4r.mmocraft.world.zone.service.ZoneManager;
+import com.x1f4r.mmocraft.world.resourcegathering.listeners.ResourceNodeInteractionListener;
+import com.x1f4r.mmocraft.world.resourcegathering.model.ResourceNodeType;
+import com.x1f4r.mmocraft.world.resourcegathering.service.ActiveNodeManager;
+import com.x1f4r.mmocraft.world.resourcegathering.service.BasicResourceNodeRegistryService;
+import com.x1f4r.mmocraft.world.resourcegathering.service.ResourceNodeRegistryService;
+
+
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.World;
+import org.bukkit.entity.EntityType;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitTask; // Added
+import org.bukkit.scheduler.BukkitTask;
 
 import java.sql.SQLException;
+import java.util.List;
 
-/**
- * Main class for the MMOCraft plugin.
- * Handles the lifecycle of the plugin, including enabling and disabling,
- * and initializes and holds references to all core services.
- *
- * @author x1f4r
- * @version 0.1.0-SNAPSHOT
- */
 public final class MMOCraftPlugin extends JavaPlugin {
 
     private ConfigService configService;
@@ -47,114 +75,135 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private PlayerDataService playerDataService;
     private DamageCalculationService damageCalculationService;
     private SkillRegistryService skillRegistryService;
-    private StatusEffectManager statusEffectManager; // Added
+    private StatusEffectManager statusEffectManager;
+    private MobStatProvider mobStatProvider;
+    private CustomItemRegistry customItemRegistry;
+    private PlayerEquipmentManager playerEquipmentManager;
+    private LootService lootService;
+    private RecipeRegistryService recipeRegistryService;
+    private CraftingUIManager craftingUIManager;
+    private CustomSpawningService customSpawningService;
+    private ZoneManager zoneManager;
+    private ResourceNodeRegistryService resourceNodeRegistryService; // Resource Gathering
+    private ActiveNodeManager activeNodeManager;                     // Resource Gathering
     private LoggingUtil loggingUtil;
-    private BukkitTask statusEffectTickTask; // Added
+    private BukkitTask statusEffectTickTask;
+    private BukkitTask customSpawningTask;
+    private BukkitTask resourceNodeTickTask;                         // Resource Gathering
 
-    /**
-     * Called when the plugin is first enabled.
-     * This method initializes all core services in the correct order:
-     * <ol>
-     *     <li>{@link ConfigService} (with a preliminary logger)</li>
-     *     <li>{@link LoggingUtil} (final version, using ConfigService)</li>
-     *     <li>{@link EventBusService}</li>
-     *     <li>{@link CommandRegistryService} (and registers commands)</li>
-     *     <li>{@link PersistenceService} (and initializes database schema)</li>
-     * </ol>
-     * It also registers event handlers and logs basic plugin information.
-     */
     @Override
     public void onEnable() {
-        // Initialize ConfigService first
-        // BasicConfigService needs JavaPlugin for file operations. LoggingUtil is now a dependency.
-        // To provide LoggingUtil to ConfigService, LoggingUtil must be created first.
-        // This creates a small dilemma: LoggingUtil wants ConfigService for debug flag, ConfigService wants LoggingUtil for logging.
-        // Solution: 1. Create a preliminary logger. 2. Create ConfigService with it. 3. Create final logger with ConfigService.
-
-        LoggingUtil preliminaryLogger = new LoggingUtil(this); // No config access yet
-        configService = new BasicConfigService(this, preliminaryLogger); // Pass plugin and preliminary logger
-
-        // Initialize LoggingUtil (final) now that ConfigService is available
+        LoggingUtil preliminaryLogger = new LoggingUtil(this);
+        configService = new BasicConfigService(this, preliminaryLogger);
         loggingUtil = new LoggingUtil(this, configService);
-        preliminaryLogger.info("Preliminary logger transitioning to final logger."); // Optional: Log transition
+        preliminaryLogger.info("Preliminary logger transitioning to final logger.");
         loggingUtil.info("Final LoggingUtil initialized.");
 
+        eventBusService = new BasicEventBusService(loggingUtil);
+        customItemRegistry = new BasicCustomItemRegistry(this, loggingUtil);
+        registerCustomItems();
+        loggingUtil.info("CustomItemRegistry initialized and items registered.");
 
-        // Initialize EventBusService
-        eventBusService = new BasicEventBusService(loggingUtil); // Pass LoggingUtil
-
-        // Initialize CommandRegistryService
-        // BasicCommandRegistryService constructor takes JavaPlugin and internally gets LoggingUtil from it.
         commandRegistryService = new BasicCommandRegistryService(this);
 
-        // Register commands
-        commandRegistryService.registerCommand("mmoc", new MMOCraftInfoCommand(this, "mmoc", "mmocraft.command.info", "Base command for MMOCraft.", loggingUtil));
-        commandRegistryService.registerCommand("playerdata", new PlayerDataAdminCommand(this));
-        commandRegistryService.registerCommand("useskill", new ExecuteSkillCommand(this)); // Added /useskill command
-
-
-        // Initialize PersistenceService
         try {
-            // SqlitePersistenceService constructor takes JavaPlugin and internally gets LoggingUtil from it.
             persistenceService = new SqlitePersistenceService(this);
-            persistenceService.initDatabase(); // This also includes logging its status
-        } catch (SQLException e) {
-            // Log with final logger if available, otherwise preliminary
+            persistenceService.initDatabase();
+        } catch (Exception e) {
             LoggingUtil loggerToUse = (loggingUtil != null) ? loggingUtil : preliminaryLogger;
             loggerToUse.severe("Failed to initialize PersistenceService or database. Plugin may not function correctly.", e);
-            // Consider disabling the plugin if persistence is critical
-            // getServer().getPluginManager().disablePlugin(this);
-            // return;
-        } catch (RuntimeException e) { // Catch RuntimeException from driver loading (e.g., ClassNotFound for JDBC)
-            LoggingUtil loggerToUse = (loggingUtil != null) ? loggingUtil : preliminaryLogger;
-            loggerToUse.severe("Failed to load database driver. Critical error, plugin may not function.", e);
-            // Consider disabling the plugin
-            // getServer().getPluginManager().disablePlugin(this);
-            // return;
         }
 
-        // Initialize PlayerDataService (depends on Persistence, Logging, EventBus)
         playerDataService = new BasicPlayerDataService(this, persistenceService, loggingUtil, eventBusService);
-        playerDataService.initDatabaseSchema(); // Create tables if they don't exist
+        playerDataService.initDatabaseSchema();
 
-        // Register PlayerData listeners
-        getServer().getPluginManager().registerEvents(new PlayerJoinQuitListener(playerDataService, loggingUtil), this);
-        loggingUtil.info("PlayerDataService and its listeners initialized.");
+        mobStatProvider = new DefaultMobStatProvider();
+        loggingUtil.info("MobStatProvider initialized.");
 
-        // Initialize DamageCalculationService (depends on PlayerDataService, LoggingUtil)
-        damageCalculationService = new BasicDamageCalculationService(playerDataService, loggingUtil);
+        damageCalculationService = new BasicDamageCalculationService(playerDataService, loggingUtil, mobStatProvider);
         loggingUtil.info("DamageCalculationService initialized.");
 
-        // Register Combat listeners
-        getServer().getPluginManager().registerEvents(new PlayerCombatListener(damageCalculationService, playerDataService, loggingUtil), this);
-        loggingUtil.info("Combat listeners registered.");
+        playerEquipmentManager = new PlayerEquipmentManager(this, playerDataService, customItemRegistry, loggingUtil);
+        loggingUtil.info("PlayerEquipmentManager initialized.");
 
-        // Initialize SkillRegistryService
         skillRegistryService = new BasicSkillRegistryService(loggingUtil);
-        registerSkills(); // Register implemented skills
+        registerSkills();
         loggingUtil.info("SkillRegistryService initialized and skills registered.");
 
-        // Initialize StatusEffectManager
         statusEffectManager = new BasicStatusEffectManager(this, loggingUtil, playerDataService);
         loggingUtil.info("StatusEffectManager initialized.");
 
-        // Start StatusEffect tick scheduler
-        long tickInterval = 20L; // 20 ticks = 1 second (Bukkit ticks)
+        lootService = new BasicLootService(this, loggingUtil);
+        registerDefaultLootTables();
+        loggingUtil.info("LootService initialized and default loot tables registered.");
+
+        recipeRegistryService = new BasicRecipeRegistryService(this, loggingUtil, customItemRegistry);
+        loggingUtil.info("RecipeRegistryService initialized.");
+
+        craftingUIManager = new CraftingUIManager(this, recipeRegistryService, playerDataService, customItemRegistry, loggingUtil);
+        loggingUtil.info("CraftingUIManager initialized.");
+
+        customSpawningService = new BasicCustomSpawningService(this, loggingUtil, mobStatProvider, lootService, customItemRegistry);
+        // TODO: Register custom spawn rules here for CustomSpawningService
+        loggingUtil.info("CustomSpawningService initialized.");
+
+        zoneManager = new BasicZoneManager(this, loggingUtil);
+        registerDefaultZones();
+        loggingUtil.info("ZoneManager initialized and default zones registered.");
+
+        resourceNodeRegistryService = new BasicResourceNodeRegistryService(loggingUtil); // Resource Gathering
+        registerResourceNodeTypes(); // Resource Gathering
+        activeNodeManager = new ActiveNodeManager(this, loggingUtil, resourceNodeRegistryService, lootService, customItemRegistry); // Resource Gathering
+        placeInitialResourceNodes(); // Resource Gathering
+        loggingUtil.info("ResourceNodeRegistryService and ActiveNodeManager initialized.");
+
+
+        // Register Listeners (after all services they depend on are initialized)
+        getServer().getPluginManager().registerEvents(new PlayerJoinQuitListener(playerDataService, loggingUtil), this);
+        getServer().getPluginManager().registerEvents(new PlayerZoneTrackerListener(this, zoneManager, eventBusService, loggingUtil), this);
+        getServer().getPluginManager().registerEvents(new PlayerCombatListener(damageCalculationService, playerDataService, loggingUtil, mobStatProvider), this);
+        getServer().getPluginManager().registerEvents(new PlayerEquipmentListener(this, playerEquipmentManager, loggingUtil), this);
+        getServer().getPluginManager().registerEvents(new ResourceNodeInteractionListener(this, activeNodeManager, resourceNodeRegistryService, lootService, customItemRegistry, playerDataService, loggingUtil), this); // Resource Gathering
+        getServer().getPluginManager().registerEvents(new MobDeathLootListener(lootService, customItemRegistry, this, loggingUtil), this);
+        // CraftingUIManager registers its own listeners.
+
+        // Register Commands (after services they depend on)
+        commandRegistryService.registerCommand("mmoc", new MMOCraftInfoCommand(this, "mmoc", "mmocraft.command.info", "Base command for MMOCraft.", loggingUtil));
+        commandRegistryService.registerCommand("useskill", new ExecuteSkillCommand(this));
+        commandRegistryService.registerCommand("mmocadm", new MMOCAdminRootCommand(this));
+        commandRegistryService.registerCommand("customcraft", new CustomCraftCommand(this));
+
+        // Start Schedulers
+        long statusEffectTickInterval = 20L; // 1 second
         statusEffectTickTask = getServer().getScheduler().runTaskTimer(this, () -> {
             if (statusEffectManager != null) {
                 statusEffectManager.tickAllActiveEffects();
             }
-        }, tickInterval, tickInterval);
-        loggingUtil.info("StatusEffect tick scheduler started (every " + tickInterval + " server ticks).");
+        }, statusEffectTickInterval, statusEffectTickInterval);
+        loggingUtil.info("StatusEffect tick scheduler started (every " + statusEffectTickInterval + " server ticks).");
+
+        long spawningInterval = 200L; // 10 seconds (20 ticks * 10 seconds)
+        customSpawningTask = getServer().getScheduler().runTaskTimer(this, () -> { // Added
+            if (customSpawningService != null) {
+                customSpawningService.attemptSpawns();
+            }
+        }, spawningInterval, spawningInterval);
+        loggingUtil.info("CustomSpawningService task scheduler started (every " + spawningInterval + " server ticks).");
+
+        long resourceNodeTickInterval = 100L; // 5 seconds (20 ticks * 5)
+        resourceNodeTickTask = getServer().getScheduler().runTaskTimer(this, () -> { // Resource Gathering
+            if (activeNodeManager != null) {
+                activeNodeManager.tickNodes();
+            }
+        }, resourceNodeTickInterval, resourceNodeTickInterval);
+        loggingUtil.info("ActiveNodeManager task scheduler started (every " + resourceNodeTickInterval + " server ticks).");
 
 
-        // Register a handler for PluginReloadedEvent
-        if (eventBusService != null) { // Defensive check, should be initialized
+        if (eventBusService != null) {
             eventBusService.register(PluginReloadedEvent.class, event -> {
                 loggingUtil.info("PluginReloadedEvent handled: Configuration has been reloaded. Event name: " + event.getEventName());
             });
         } else {
-            // This case should ideally not be reached if initialization order is correct.
             loggingUtil.warning("EventBusService was not initialized. Cannot register PluginReloadedEvent handler.");
         }
 
@@ -163,126 +212,154 @@ public final class MMOCraftPlugin extends JavaPlugin {
         loggingUtil.debug("onEnable sequence completed. Debug logging is " + (configService.getBoolean("core.debug-logging") ? "enabled" : "disabled") + ".");
     }
 
-    /**
-     * Called when the plugin is disabled.
-     * Performs cleanup of services, such as closing database connections.
-     * Logs the shutdown sequence.
-     */
     @Override
     public void onDisable() {
         loggingUtil.info("MMOCraft shutting down...");
 
-        // Close persistence service connection
+        if (resourceNodeTickTask != null && !resourceNodeTickTask.isCancelled()) { // Resource Gathering
+            resourceNodeTickTask.cancel();
+            loggingUtil.info("ActiveNodeManager task scheduler cancelled.");
+        }
+        if (customSpawningTask != null && !customSpawningTask.isCancelled()) {
+            customSpawningTask.cancel();
+            loggingUtil.info("CustomSpawningService task scheduler cancelled.");
+        }
+        if (statusEffectTickTask != null && !statusEffectTickTask.isCancelled()) {
+            statusEffectTickTask.cancel();
+            loggingUtil.info("StatusEffect tick scheduler cancelled.");
+        }
+
+        if (playerDataService instanceof BasicPlayerDataService) {
+            ((BasicPlayerDataService) playerDataService).shutdown();
+        }
+        if (statusEffectManager instanceof BasicStatusEffectManager) {
+            ((BasicStatusEffectManager) statusEffectManager).shutdown();
+        }
+        if (customSpawningService instanceof BasicCustomSpawningService) {
+            ((BasicCustomSpawningService) customSpawningService).shutdown();
+        }
+        if (activeNodeManager != null) { // Resource Gathering
+            activeNodeManager.shutdown();
+        }
         if (persistenceService != null) {
             try {
-                persistenceService.close(); // Service itself should log success/failure
+                persistenceService.close();
             } catch (SQLException e) {
-                // This catch is a fallback; service should ideally handle its own logging for close errors.
                 loggingUtil.severe("Error while closing database connection: " + e.getMessage(), e);
             }
         } else {
             loggingUtil.warning("PersistenceService was not initialized, nothing to close.");
         }
-
-        // Add any other service cleanup here in the future (e.g., eventBusService.shutdown())
-        if (playerDataService instanceof BasicPlayerDataService) {
-            ((BasicPlayerDataService) playerDataService).shutdown();
-        }
-        if (statusEffectManager instanceof BasicStatusEffectManager) { // Added manager shutdown
-            ((BasicStatusEffectManager) statusEffectManager).shutdown();
-        }
-        if (statusEffectTickTask != null && !statusEffectTickTask.isCancelled()) { // Added task cancellation
-            statusEffectTickTask.cancel();
-            loggingUtil.info("StatusEffect tick scheduler cancelled.");
-        }
-
         loggingUtil.info("MMOCraft has been disabled.");
     }
 
     // --- Service Getters ---
+    public ConfigService getConfigService() { return configService; }
+    public EventBusService getEventBusService() { return eventBusService; }
+    public PersistenceService getPersistenceService() { return persistenceService; }
+    public CommandRegistryService getCommandRegistryService() { return commandRegistryService; }
+    public PlayerDataService getPlayerDataService() { return playerDataService; }
+    public DamageCalculationService getDamageCalculationService() { return damageCalculationService; }
+    public SkillRegistryService getSkillRegistryService() { return skillRegistryService; }
+    public StatusEffectManager getStatusEffectManager() { return statusEffectManager; }
+    public MobStatProvider getMobStatProvider() { return mobStatProvider; }
+    public CustomItemRegistry getCustomItemRegistry() { return customItemRegistry; }
+    public PlayerEquipmentManager getPlayerEquipmentManager() { return playerEquipmentManager; }
+    public LootService getLootService() { return lootService; }
+    public RecipeRegistryService getRecipeRegistryService() { return recipeRegistryService; }
+    public CraftingUIManager getCraftingUIManager() { return craftingUIManager; }
+    public CustomSpawningService getCustomSpawningService() { return customSpawningService; }
+    public ZoneManager getZoneManager() { return zoneManager; }
+    public ResourceNodeRegistryService getResourceNodeRegistryService() { return resourceNodeRegistryService; } // Resource Gathering
+    public ActiveNodeManager getActiveNodeManager() { return activeNodeManager; }                     // Resource Gathering
+    public LoggingUtil getLoggingUtil() { return loggingUtil; }
 
-    /**
-     * Gets the active configuration service.
-     * Used to access plugin configuration values.
-     * @return The {@link ConfigService} instance.
-     */
-    public ConfigService getConfigService() {
-        return configService;
+    // --- Plugin Setup Methods ---
+    private void registerResourceNodeTypes() { // Resource Gathering
+        if (resourceNodeRegistryService == null || lootService == null) {
+            loggingUtil.severe("ResourceNodeRegistryService or LootService not initialized. Cannot register node types.");
+            return;
+        }
+        // Ensure a loot table for "stone_node_loot" exists or is created.
+        // For testing, we can make a dummy one if it doesn't affect other tests.
+        // Or assume it's defined elsewhere (e.g. via config or another system)
+         if (lootService.getLootTableById("stone_node_loot").isEmpty()) {
+            LootTable stoneLoot = new LootTable("stone_node_loot", List.of(
+                new LootTableEntry("COBBLESTONE", 1.0, 1, 1) // Using Material name as placeholder item ID
+            ));
+            lootService.registerLootTable(null, stoneLoot); // Registering without EntityType for general use
+             loggingUtil.info("Registered placeholder 'stone_node_loot' table for resource node testing.");
+        }
+         if (lootService.getLootTableById("iron_ore_node_loot").isEmpty()) {
+            LootTable ironLoot = new LootTable("iron_ore_node_loot", List.of(
+                new LootTableEntry("RAW_IRON", 1.0, 1, 1)
+            ));
+            lootService.registerLootTable(null, ironLoot);
+             loggingUtil.info("Registered placeholder 'iron_ore_node_loot' table for resource node testing.");
+        }
+
+
+        ResourceNodeType stoneNode = new ResourceNodeType(
+                "stone_node", Material.STONE, 5.0,
+                Set.of(Material.WOODEN_PICKAXE, Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE),
+                "stone_node_loot", 60, "&7Stone Deposit"
+        );
+        resourceNodeRegistryService.registerNodeType(stoneNode);
+
+        ResourceNodeType ironOreNode = new ResourceNodeType(
+                "iron_ore_node", Material.IRON_ORE, 10.0,
+                Set.of(Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE),
+                "iron_ore_node_loot", 180, "&fIron Vein"
+        );
+        resourceNodeRegistryService.registerNodeType(ironOreNode);
+        loggingUtil.info("Registered default resource node types.");
     }
 
-    /**
-     * Gets the active event bus service.
-     * Used to register custom event handlers and to publish custom events.
-     * @return The {@link EventBusService} instance.
-     */
-    public EventBusService getEventBusService() {
-        return eventBusService;
+    private void placeInitialResourceNodes() { // Resource Gathering
+        if (activeNodeManager == null) {
+            loggingUtil.severe("ActiveNodeManager not initialized. Cannot place initial resource nodes.");
+            return;
+        }
+        World defaultWorld = Bukkit.getWorld("world");
+        if (defaultWorld == null && !Bukkit.getWorlds().isEmpty()) {
+            defaultWorld = Bukkit.getWorlds().get(0);
+        }
+        if (defaultWorld == null) {
+            loggingUtil.severe("No worlds loaded. Cannot place initial resource nodes.");
+            return;
+        }
+
+        // Example locations - ensure these are suitable for your test world
+        activeNodeManager.placeNewNode(new Location(defaultWorld, 10, 60, 10), "stone_node");
+        activeNodeManager.placeNewNode(new Location(defaultWorld, 12, 60, 10), "stone_node");
+        activeNodeManager.placeNewNode(new Location(defaultWorld, 10, 60, 12), "iron_ore_node");
+        loggingUtil.info("Placed initial resource nodes in world '" + defaultWorld.getName() + "'.");
     }
 
-    /**
-     * Gets the active persistence service.
-     * Used for database interactions.
-     * @return The {@link PersistenceService} instance, or null if it failed to initialize.
-     */
-    public PersistenceService getPersistenceService() {
-        return persistenceService;
-    }
+    private void registerDefaultZones() {
+        if (zoneManager == null) {
+            loggingUtil.severe("ZoneManager not initialized. Cannot register default zones.");
+            return;
+        }
+        World defaultWorld = Bukkit.getWorld("world");
+        if (defaultWorld == null) {
+            if (!Bukkit.getWorlds().isEmpty()) {
+                defaultWorld = Bukkit.getWorlds().get(0);
+                loggingUtil.warning("'world' not found. Using first loaded world for default zone: " + defaultWorld.getName());
+            } else {
+                loggingUtil.severe("No worlds loaded. Cannot register 'SpawnSanctuary' default zone.");
+                return;
+            }
+        }
 
-    /**
-     * Gets the active command registry service.
-     * Used to register plugin commands.
-     * @return The {@link CommandRegistryService} instance.
-     */
-    public CommandRegistryService getCommandRegistryService() {
-        return commandRegistryService;
+        Zone spawnSanctuary = new Zone(
+                "spawn_sanctuary", "Spawn Sanctuary", defaultWorld.getName(),
+                -50, 0, -50, 50, 128, 50,
+                Map.of("isSanctuary", true, "pvpAllowed", false)
+        );
+        zoneManager.registerZone(spawnSanctuary);
+        loggingUtil.info("Registered default zone: Spawn Sanctuary in world '" + defaultWorld.getName() + "'");
     }
-
-    /**
-     * Gets the active player data service.
-     * Used for managing player profiles and game-specific data.
-     * @return The {@link PlayerDataService} instance.
-     */
-    public PlayerDataService getPlayerDataService() {
-        return playerDataService;
-    }
-
-    /**
-     * Gets the active damage calculation service.
-     * Used for determining combat outcomes.
-     * @return The {@link DamageCalculationService} instance.
-     */
-    public DamageCalculationService getDamageCalculationService() { // Added
-        return damageCalculationService;
-    }
-
-    /**
-     * Gets the active skill registry service.
-     * Used to manage and access available skills.
-     * @return The {@link SkillRegistryService} instance.
-     */
-    public SkillRegistryService getSkillRegistryService() { // Added
-        return skillRegistryService;
-    }
-
-    /**
-     * Gets the active status effect manager.
-     * Used for applying, removing, and ticking status effects on entities.
-     * @return The {@link StatusEffectManager} instance.
-     */
-    public StatusEffectManager getStatusEffectManager() { // Added
-        return statusEffectManager;
-    }
-
-    /**
-     * Gets the primary logging utility for the plugin.
-     * Used for standardized console logging.
-     * @return The {@link LoggingUtil} instance.
-     */
-    public LoggingUtil getLoggingUtil() {
-        return loggingUtil;
-    }
-
-    // --- Plugin Actions ---
 
     private void registerSkills() {
         if (skillRegistryService == null) {
@@ -291,19 +368,33 @@ public final class MMOCraftPlugin extends JavaPlugin {
         }
         skillRegistryService.registerSkill(new StrongStrikeSkill(this));
         skillRegistryService.registerSkill(new MinorHealSkill(this));
-        // Add more skills here as they are implemented
     }
 
-    /**
-     * Reloads the plugin's configuration.
-     * This involves calling the reload method on the {@link ConfigService}
-     * and then firing a {@link PluginReloadedEvent} on the event bus.
-     */
+    private void registerCustomItems() {
+        if (customItemRegistry == null) {
+            loggingUtil.severe("CustomItemRegistry not initialized. Cannot register custom items.");
+            return;
+        }
+        customItemRegistry.registerItem(new SimpleSword(this));
+        customItemRegistry.registerItem(new TrainingArmor(this));
+    }
+
+    private void registerDefaultLootTables() {
+        if (lootService == null || customItemRegistry == null) {
+            loggingUtil.severe("LootService or CustomItemRegistry not initialized. Cannot register default loot tables.");
+            return;
+        }
+        LootTable zombieLootTable = new LootTable("zombie_common_drops", List.of(
+            new LootTableEntry("simple_sword", 0.05, 1, 1)
+        ));
+        lootService.registerLootTable(EntityType.ZOMBIE, zombieLootTable);
+        loggingUtil.info("Default loot tables registered.");
+    }
+
     public void reloadPluginConfig() {
         if (configService != null) {
-            configService.reloadConfig(); // ConfigService should log its own status
+            configService.reloadConfig();
             loggingUtil.info("MMOCraft configuration reloaded via reloadPluginConfig().");
-            // Example of re-checking a config value after reload
             loggingUtil.info("Default Max Health after reload: " + configService.getInt("stats.max-health"));
             loggingUtil.debug("Debug status after reload: " + (configService.getBoolean("core.debug-logging") ? "enabled" : "disabled") + ".");
 
