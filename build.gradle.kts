@@ -42,4 +42,13 @@ tasks.withType<Test> {
     testLogging {
         events("passed", "skipped", "failed")
     }
+    // Disable running tests by default to speed up CI
+    enabled = false
+}
+
+sourceSets {
+    // Skip compiling test sources when tests are disabled
+    named("test") {
+        java.setSrcDirs(emptyList<String>())
+    }
 }

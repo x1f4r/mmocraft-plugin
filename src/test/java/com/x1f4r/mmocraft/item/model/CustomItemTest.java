@@ -36,7 +36,7 @@ class CustomItemTest {
 
     private TestCustomItem testCustomItem;
     private TestCustomItemWithStats testCustomItemWithStats;
-    private TestCustomItemWithRarity testCustomItemWithRarity; // Added for rarity test
+    private TestCommonItem testCustomItemWithRarity; // Using common rarity item
     private NamespacedKey nbtKey;
 
     // Concrete implementation for testing

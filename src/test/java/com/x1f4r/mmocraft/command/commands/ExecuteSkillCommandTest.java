@@ -100,7 +100,7 @@ class ExecuteSkillCommandTest {
         when(mockSkillRegistry.getSkill(testSkillId)).thenReturn(Optional.of(mockSkill));
         when(mockSkill.canUse(mockSenderProfile)).thenReturn(false);
         when(mockSenderProfile.isSkillOnCooldown(testSkillId)).thenReturn(false); // Not on cooldown
-        when(mockSenderProfile.getCurrentMana()).thenReturn(5.0);
+        when(mockSenderProfile.getCurrentMana()).thenReturn(5L);
         when(mockSkill.getManaCost()).thenReturn(10.0);
 
         executeSkillCommand.onCommand(mockSenderPlayer, new String[]{testSkillId});
