@@ -67,7 +67,7 @@ public class MinorHealSkill extends Skill {
         long actualHeal = casterProfile.getCurrentHealth() - oldHealth;
 
         // Update Bukkit's health for the player
-        double newBukkitHealth = Math.min(casterPlayer.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MAX_HEALTH).getValue(), casterPlayer.getHealth() + actualHeal);
+        double newBukkitHealth = Math.min(casterPlayer.getMaxHealth(), casterPlayer.getHealth() + actualHeal);
         casterPlayer.setHealth(newBukkitHealth);
 
         casterPlayer.sendMessage(StringUtil.colorize("&aYou cast " + getSkillName() + " and healed yourself for &f" + String.format("%.1f", (double)actualHeal) + "&a health."));
@@ -79,6 +79,6 @@ public class MinorHealSkill extends Skill {
 
 
         // Deduct mana
-        casterProfile.setCurrentMana(casterProfile.getCurrentMana() - this.getManaCost());
+        casterProfile.setCurrentMana(casterProfile.getCurrentMana() - (long) this.getManaCost());
     }
 }

@@ -42,11 +42,9 @@ public class MMOCAdminRootCommand extends AbstractPluginCommand {
 
         // Check if the sender has permission for any registered subcommand to avoid "No admin modules available"
         // if they have permission for a dynamically registered one but not the hardcoded ones above.
-        boolean hasAtLeastOneSubCommandPermission = subCommands.keySet().stream()
-            .anyMatch(key -> sender.hasPermission(subCommands.get(key).getPermission()));
-
-        if (!hasAtLeastOneSubCommandPermission) {
-             sender.sendMessage(StringUtil.colorize("&7No admin modules available to you or none registered."));
+        boolean hasAtLeastOneSubCommand = !subCommands.isEmpty();
+        if (!hasAtLeastOneSubCommand) {
+            sender.sendMessage(StringUtil.colorize("&7No admin modules available to you or none registered."));
         }
         return true;
     }
@@ -56,6 +54,11 @@ public class MMOCAdminRootCommand extends AbstractPluginCommand {
         // This method in AbstractPluginCommand already handles suggesting registered subcommand names
         // like "combat" when args.length == 1.
         // If further arguments were directly for /mmocadm, they would be handled here.
-        return super.onTabComplete(sender, args); // Delegates to AbstractPluginCommand's logic
+        if (args.length == 1) {
+            return subCommands.keySet().stream()
+                    .filter(name -> name.startsWith(args[0].toLowerCase()))
+                    .collect(Collectors.toList());
+        }
+        return Collections.emptyList();
     }
 }

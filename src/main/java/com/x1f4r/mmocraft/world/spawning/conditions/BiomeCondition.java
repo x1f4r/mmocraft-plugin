@@ -6,7 +6,7 @@ import org.bukkit.block.Biome;
 import org.bukkit.entity.Player;
 
 import java.util.Collections;
-import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Set;
 
 public class BiomeCondition implements SpawnCondition {
@@ -14,11 +14,14 @@ public class BiomeCondition implements SpawnCondition {
     private final Set<Biome> allowedBiomes;
 
     public BiomeCondition(Set<Biome> allowedBiomes) {
-        this.allowedBiomes = Collections.unmodifiableSet(EnumSet.copyOf(allowedBiomes));
+        Set<Biome> set = new HashSet<>(allowedBiomes);
+        this.allowedBiomes = Collections.unmodifiableSet(set);
     }
 
     public BiomeCondition(Biome... biomes) {
-        this.allowedBiomes = Collections.unmodifiableSet(EnumSet.copyOf(Set.of(biomes)));
+        Set<Biome> set = new HashSet<>();
+        Collections.addAll(set, biomes);
+        this.allowedBiomes = Collections.unmodifiableSet(set);
     }
 
     @Override

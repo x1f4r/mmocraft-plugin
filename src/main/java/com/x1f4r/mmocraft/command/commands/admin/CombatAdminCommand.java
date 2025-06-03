@@ -5,6 +5,7 @@ import com.x1f4r.mmocraft.combat.model.DamageInstance;
 import com.x1f4r.mmocraft.combat.model.DamageType;
 import com.x1f4r.mmocraft.combat.service.DamageCalculationService;
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
+import com.x1f4r.mmocraft.command.CommandExecutable;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
 
@@ -13,6 +14,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import java.util.Collections;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.Arrays;
@@ -57,7 +59,17 @@ public class CombatAdminCommand extends AbstractPluginCommand {
         this.damageCalcService = plugin.getDamageCalculationService();
         this.logger = plugin.getLoggingUtil();
 
-        registerSubCommand("testdamage", this::executeTestDamage);
+        registerSubCommand("testdamage", new CommandExecutable() {
+            @Override
+            public boolean onCommand(CommandSender sender, String[] args) {
+                return executeTestDamage(sender, args);
+            }
+
+            @Override
+            public List<String> onTabComplete(CommandSender sender, String[] args) {
+                return Collections.emptyList();
+            }
+        });
     }
 
     @Override
@@ -145,8 +157,10 @@ public class CombatAdminCommand extends AbstractPluginCommand {
 
         String currentCmdArg = args[args.length -1].toLowerCase();
 
-        if (args.length == 2) { // Suggesting for "testdamage", etc.
-            return super.onTabComplete(sender, args); // Let AbstractPluginCommand handle subcommand names
+        if (args.length == 2) { // Suggest subcommand names
+            return subCommands.keySet().stream()
+                    .filter(name -> name.startsWith(args[1].toLowerCase()))
+                    .collect(Collectors.toList());
         }
 
         String combatSubCommand = args[1].toLowerCase();

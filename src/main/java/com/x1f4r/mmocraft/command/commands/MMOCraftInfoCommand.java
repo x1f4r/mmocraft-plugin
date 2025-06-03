@@ -37,13 +37,19 @@ public class MMOCraftInfoCommand extends AbstractPluginCommand {
         });
 
         // Register another simple subcommand: /mmoc help
-        registerSubCommand("help", (s, a) -> { // s for sender, a for args
-            s.sendMessage(StringUtil.colorize("&6--- MMOCraft Help ---"));
-            s.sendMessage(StringUtil.colorize("&b/" + commandName + " version &7- Shows plugin version."));
-            s.sendMessage(StringUtil.colorize("&b/" + commandName + " help &7- Shows this help message."));
-            // Add more help messages as other subcommands are added
-            // Example: logger.info("Help shown to " + s.getName());
-            return true;
+        registerSubCommand("help", new CommandExecutable() {
+            @Override
+            public boolean onCommand(CommandSender sender, String[] args) {
+                sender.sendMessage(StringUtil.colorize("&6--- MMOCraft Help ---"));
+                sender.sendMessage(StringUtil.colorize("&b/" + commandName + " version &7- Shows plugin version."));
+                sender.sendMessage(StringUtil.colorize("&b/" + commandName + " help &7- Shows this help message."));
+                return true;
+            }
+
+            @Override
+            public List<String> onTabComplete(CommandSender sender, String[] args) {
+                return Collections.emptyList();
+            }
         });
     }
 

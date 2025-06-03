@@ -1,6 +1,6 @@
 package com.x1f4r.mmocraft.world.resourcegathering.service;
 
-import com.x1f4r.mmocraft.MMOCraftPlugin;
+import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.item.service.CustomItemRegistry; // Not directly used in this impl, but good for context
 import com.x1f4r.mmocraft.loot.service.LootService;       // Not directly used in this impl, but good for context
 import com.x1f4r.mmocraft.util.LoggingUtil;
@@ -14,6 +14,7 @@ import org.bukkit.inventory.ItemStack; // If we drop items directly, not via Loo
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ActiveNodeManager {

@@ -65,6 +65,8 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public final class MMOCraftPlugin extends JavaPlugin {
 
@@ -147,7 +149,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
         // TODO: Register custom spawn rules here for CustomSpawningService
         loggingUtil.info("CustomSpawningService initialized.");
 
-        zoneManager = new BasicZoneManager(this, loggingUtil);
+        zoneManager = new BasicZoneManager(this, loggingUtil, eventBusService);
         registerDefaultZones();
         loggingUtil.info("ZoneManager initialized and default zones registered.");
 
@@ -160,7 +162,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
 
         // Register Listeners (after all services they depend on are initialized)
         getServer().getPluginManager().registerEvents(new PlayerJoinQuitListener(playerDataService, loggingUtil), this);
-        getServer().getPluginManager().registerEvents(new PlayerZoneTrackerListener(this, zoneManager, eventBusService, loggingUtil), this);
+        getServer().getPluginManager().registerEvents(new PlayerZoneTrackerListener(zoneManager, loggingUtil, eventBusService), this);
         getServer().getPluginManager().registerEvents(new PlayerCombatListener(damageCalculationService, playerDataService, loggingUtil, mobStatProvider), this);
         getServer().getPluginManager().registerEvents(new PlayerEquipmentListener(this, playerEquipmentManager, loggingUtil), this);
         getServer().getPluginManager().registerEvents(new ResourceNodeInteractionListener(this, activeNodeManager, resourceNodeRegistryService, lootService, customItemRegistry, playerDataService, loggingUtil), this); // Resource Gathering
