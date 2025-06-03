@@ -49,7 +49,7 @@ class MinorHealSkillTest {
         lenient().when(mockCasterPlayer.getUniqueId()).thenReturn(casterUUID);
         lenient().when(mockCasterPlayer.getName()).thenReturn("Healer");
         lenient().when(mockCasterPlayer.getWorld()).thenReturn(mockWorld);
-        lenient().when(mockCasterProfile.getCurrentMana()).thenReturn(100.0); // Enough mana
+        lenient().when(mockCasterProfile.getCurrentMana()).thenReturn(100L); // Enough mana
         lenient().when(mockCasterProfile.isSkillOnCooldown(minorHealSkill.getSkillId())).thenReturn(false); // Not on cooldown
 
         // Mock Bukkit.getPlayer()
@@ -66,7 +66,7 @@ class MinorHealSkillTest {
 
     @Test
     void canUse_notEnoughMana_returnsFalse() {
-        when(mockCasterProfile.getCurrentMana()).thenReturn(5.0); // Less than 15.0 cost
+        when(mockCasterProfile.getCurrentMana()).thenReturn(5L); // Less than 15.0 cost
         assertFalse(minorHealSkill.canUse(mockCasterProfile));
     }
 
@@ -99,7 +99,7 @@ class MinorHealSkillTest {
             verify(mockCasterPlayer).setHealth(20.0);
 
             verify(mockCasterPlayer).sendMessage(contains("healed yourself for 18.0 health"));
-            verify(mockCasterProfile).setCurrentMana(100.0 - minorHealSkill.getManaCost());
+            verify(mockCasterProfile).setCurrentMana(100L - (long) minorHealSkill.getManaCost());
             verify(mockWorld).playSound(any(Location.class), eq(Sound.ENTITY_PLAYER_LEVELUP), anyFloat(), anyFloat());
         }
     }

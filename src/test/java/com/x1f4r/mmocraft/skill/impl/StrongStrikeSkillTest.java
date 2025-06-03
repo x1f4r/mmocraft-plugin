@@ -57,7 +57,7 @@ class StrongStrikeSkillTest {
         lenient().when(mockCasterPlayer.getUniqueId()).thenReturn(casterUUID);
         lenient().when(mockCasterPlayer.getName()).thenReturn("CasterP");
         lenient().when(mockCasterPlayer.getWorld()).thenReturn(mockWorld); // For sound
-        lenient().when(mockCasterProfile.getCurrentMana()).thenReturn(100.0); // Enough mana
+        lenient().when(mockCasterProfile.getCurrentMana()).thenReturn(100L); // Enough mana
         lenient().when(mockCasterProfile.isSkillOnCooldown(strongStrikeSkill.getSkillId())).thenReturn(false); // Not on cooldown
 
         // Target setup
@@ -79,7 +79,7 @@ class StrongStrikeSkillTest {
 
     @Test
     void canUse_notEnoughMana_returnsFalse() {
-        when(mockCasterProfile.getCurrentMana()).thenReturn(5.0); // Less than 10.0 cost
+        when(mockCasterProfile.getCurrentMana()).thenReturn(5L); // Less than 10.0 cost
         assertFalse(strongStrikeSkill.canUse(mockCasterProfile));
     }
 
@@ -114,7 +114,7 @@ class StrongStrikeSkillTest {
 
             verify(mockTargetEntity).damage(eq(25.5), eq(mockCasterPlayer));
             verify(mockCasterPlayer).sendMessage(contains("hit TargetMob with Strong Strike for 25.50 damage!"));
-            verify(mockCasterProfile).setCurrentMana(100.0 - strongStrikeSkill.getManaCost());
+            verify(mockCasterProfile).setCurrentMana(100L - (long) strongStrikeSkill.getManaCost());
             verify(mockWorld).playSound(any(Location.class), eq(Sound.ENTITY_PLAYER_ATTACK_STRONG), anyFloat(), anyFloat());
         }
     }
