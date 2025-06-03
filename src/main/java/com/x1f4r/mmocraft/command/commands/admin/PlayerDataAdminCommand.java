@@ -1,6 +1,7 @@
 package com.x1f4r.mmocraft.command.commands.admin;
 
 import com.x1f4r.mmocraft.command.AbstractPluginCommand;
+import com.x1f4r.mmocraft.command.CommandExecutable;
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.playerdata.PlayerDataService;
 import com.x1f4r.mmocraft.playerdata.model.PlayerProfile;
@@ -42,11 +43,61 @@ public class PlayerDataAdminCommand extends AbstractPluginCommand {
         this.logger = plugin.getLoggingUtil();
 
         // Register subcommands
-        registerSubCommand("view", this::executeView);
-        registerSubCommand("setstat", this::executeSetStat);
-        registerSubCommand("setlevel", this::executeSetLevel);
-        registerSubCommand("addxp", this::executeAddXp);
-        registerSubCommand("addcurrency", this::executeAddCurrency);
+        registerSubCommand("view", new CommandExecutable() {
+            @Override
+            public boolean onCommand(CommandSender sender, String[] args) {
+                return executeView(sender, args);
+            }
+
+            @Override
+            public List<String> onTabComplete(CommandSender sender, String[] args) {
+                return Collections.emptyList();
+            }
+        });
+        registerSubCommand("setstat", new CommandExecutable() {
+            @Override
+            public boolean onCommand(CommandSender sender, String[] args) {
+                return executeSetStat(sender, args);
+            }
+
+            @Override
+            public List<String> onTabComplete(CommandSender sender, String[] args) {
+                return Collections.emptyList();
+            }
+        });
+        registerSubCommand("setlevel", new CommandExecutable() {
+            @Override
+            public boolean onCommand(CommandSender sender, String[] args) {
+                return executeSetLevel(sender, args);
+            }
+
+            @Override
+            public List<String> onTabComplete(CommandSender sender, String[] args) {
+                return Collections.emptyList();
+            }
+        });
+        registerSubCommand("addxp", new CommandExecutable() {
+            @Override
+            public boolean onCommand(CommandSender sender, String[] args) {
+                return executeAddXp(sender, args);
+            }
+
+            @Override
+            public List<String> onTabComplete(CommandSender sender, String[] args) {
+                return Collections.emptyList();
+            }
+        });
+        registerSubCommand("addcurrency", new CommandExecutable() {
+            @Override
+            public boolean onCommand(CommandSender sender, String[] args) {
+                return executeAddCurrency(sender, args);
+            }
+
+            @Override
+            public List<String> onTabComplete(CommandSender sender, String[] args) {
+                return Collections.emptyList();
+            }
+        });
     }
 
     // Base /playerdata command execution (shows help)

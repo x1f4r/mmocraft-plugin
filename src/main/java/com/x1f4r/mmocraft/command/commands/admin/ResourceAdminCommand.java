@@ -1,6 +1,6 @@
 package com.x1f4r.mmocraft.command.commands.admin;
 
-import com.x1f4r.mmocraft.MMOCraftPlugin;
+import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.command.AbstractPluginCommand;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
@@ -18,6 +18,7 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -29,7 +30,7 @@ public class ResourceAdminCommand extends AbstractPluginCommand {
     private final LoggingUtil logger;
 
     public ResourceAdminCommand(MMOCraftPlugin plugin, String commandName, String permission) {
-        super(commandName, permission, plugin.getLoggingUtil());
+        super(commandName, permission, "Admin command for resource nodes");
         this.plugin = plugin;
         this.activeNodeManager = plugin.getActiveNodeManager();
         this.nodeRegistryService = plugin.getResourceNodeRegistryService();
@@ -42,7 +43,7 @@ public class ResourceAdminCommand extends AbstractPluginCommand {
     }
 
     @Override
-    protected boolean onCommandLogic(CommandSender sender, String[] args) {
+    public boolean onCommand(CommandSender sender, String[] args) {
         if (args.length == 0) {
             sendHelp(sender);
             return true;
@@ -184,7 +185,7 @@ public class ResourceAdminCommand extends AbstractPluginCommand {
 
 
     @Override
-    protected List<String> onTabCompleteLogic(CommandSender sender, String[] args) {
+    public List<String> onTabComplete(CommandSender sender, String[] args) {
         if (args.length == 1) {
             return List.of("place", "remove", "info").stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))

@@ -6,6 +6,9 @@ import com.x1f4r.mmocraft.item.model.CustomItem;
 import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
+import com.x1f4r.mmocraft.command.CommandExecutable;
+
+import java.util.Collections;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -34,7 +37,17 @@ public class ItemAdminCommand extends AbstractPluginCommand {
         this.customItemRegistry = plugin.getCustomItemRegistry();
         this.logger = plugin.getLoggingUtil();
 
-        registerSubCommand("give", this::executeGive);
+        registerSubCommand("give", new CommandExecutable() {
+            @Override
+            public boolean onCommand(CommandSender sender, String[] args) {
+                return executeGive(sender, args);
+            }
+
+            @Override
+            public List<String> onTabComplete(CommandSender sender, String[] args) {
+                return Collections.emptyList();
+            }
+        });
         // Add other item-related subcommands here like "list", "delete", "spawn"
     }
 
@@ -117,8 +130,10 @@ public class ItemAdminCommand extends AbstractPluginCommand {
         // args[3] is <customItemId> for "give"
         // args[4] is [amount] for "give"
 
-        if (args.length == 2) { // Suggesting for "give", etc.
-            return super.onTabComplete(sender, args); // Let AbstractPluginCommand handle its own subcommands
+        if (args.length == 2) {
+            return subCommands.keySet().stream()
+                    .filter(name -> name.startsWith(args[1].toLowerCase()))
+                    .collect(Collectors.toList());
         }
 
         String itemSubCommand = args[1].toLowerCase();
