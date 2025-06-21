@@ -30,6 +30,10 @@ java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(javaVersion))
 }
 
+tasks.withType<JavaCompile> {
+    options.compilerArgs.add("-Xlint:deprecation")
+}
+
 // Configure shadowJar to include the SQLite JDBC driver
 tasks.shadowJar {
     archiveClassifier.set("") // Optional: removes the 'all' classifier from the uber-jar
