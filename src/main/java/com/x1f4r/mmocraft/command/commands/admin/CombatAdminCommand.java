@@ -9,8 +9,9 @@ import com.x1f4r.mmocraft.command.CommandExecutable;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -89,11 +90,11 @@ public class CombatAdminCommand extends AbstractPluginCommand {
 
     private boolean executeTestDamage(CommandSender sender, String[] args) {
         if (!sender.hasPermission(PERM_COMBAT_TESTDAMAGE)) {
-            sender.sendMessage(ChatColor.RED + "You don't have permission for this command.");
+            sender.sendMessage(Component.text("You don't have permission for this command.", NamedTextColor.RED));
             return true;
         }
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.RED + "Usage: /mmocadm combat testdamage <attackerPlayerName> <victimPlayerName> [weaponMaterialName]");
+            sender.sendMessage(Component.text("Usage: /mmocadm combat testdamage <attackerPlayerName> <victimPlayerName> [weaponMaterialName]", NamedTextColor.RED));
             return true;
         }
 
@@ -105,11 +106,11 @@ public class CombatAdminCommand extends AbstractPluginCommand {
         Player victim = Bukkit.getPlayerExact(victimName);
 
         if (attacker == null) {
-            sender.sendMessage(ChatColor.RED + "Attacker player '" + attackerName + "' not found or not online.");
+            sender.sendMessage(Component.text("Attacker player '" + attackerName + "' not found or not online.", NamedTextColor.RED));
             return true;
         }
         if (victim == null) {
-            sender.sendMessage(ChatColor.RED + "Victim player '" + victimName + "' not found or not online.");
+            sender.sendMessage(Component.text("Victim player '" + victimName + "' not found or not online.", NamedTextColor.RED));
             return true;
         }
 
@@ -117,7 +118,7 @@ public class CombatAdminCommand extends AbstractPluginCommand {
         try {
             weaponMaterial = Material.valueOf(weaponMaterialName);
         } catch (IllegalArgumentException e) {
-            sender.sendMessage(ChatColor.RED + "Invalid weapon material: " + weaponMaterialName);
+            sender.sendMessage(Component.text("Invalid weapon material: " + weaponMaterialName, NamedTextColor.RED));
             // Send list of valid weapon materials? Could be long.
             return true;
         }

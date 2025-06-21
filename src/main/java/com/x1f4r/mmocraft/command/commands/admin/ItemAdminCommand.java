@@ -10,8 +10,10 @@ import com.x1f4r.mmocraft.command.CommandExecutable;
 
 import java.util.Collections;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
+// import org.bukkit.ChatColor; // No longer needed
 import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -68,11 +70,11 @@ public class ItemAdminCommand extends AbstractPluginCommand {
 
     private boolean executeGive(CommandSender sender, String[] args) {
         if (!sender.hasPermission(PERM_ITEM_GIVE)) {
-            sender.sendMessage(ChatColor.RED + "You don't have permission for this command.");
+            sender.sendMessage(Component.text("You don't have permission for this command.", NamedTextColor.RED));
             return true;
         }
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.RED + "Usage: /mmocadm item give <playerName> <customItemId> [amount]");
+            sender.sendMessage(Component.text("Usage: /mmocadm item give <playerName> <customItemId> [amount]", NamedTextColor.RED));
             return true;
         }
 
@@ -84,24 +86,24 @@ public class ItemAdminCommand extends AbstractPluginCommand {
             try {
                 amount = Integer.parseInt(args[2]);
                 if (amount <= 0) {
-                    sender.sendMessage(ChatColor.RED + "Amount must be positive.");
+                    sender.sendMessage(Component.text("Amount must be positive.", NamedTextColor.RED));
                     return true;
                 }
             } catch (NumberFormatException e) {
-                sender.sendMessage(ChatColor.RED + "Invalid amount: " + args[2]);
+                sender.sendMessage(Component.text("Invalid amount: " + args[2], NamedTextColor.RED));
                 return true;
             }
         }
 
         Player targetPlayer = Bukkit.getPlayerExact(playerName);
         if (targetPlayer == null) {
-            sender.sendMessage(ChatColor.RED + "Player '" + playerName + "' not found or not online.");
+            sender.sendMessage(Component.text("Player '" + playerName + "' not found or not online.", NamedTextColor.RED));
             return true;
         }
 
         Optional<CustomItem> optCustomItem = customItemRegistry.getCustomItem(customItemId);
         if (optCustomItem.isEmpty()) {
-            sender.sendMessage(ChatColor.RED + "Custom item with ID '" + customItemId + "' not found.");
+            sender.sendMessage(Component.text("Custom item with ID '" + customItemId + "' not found.", NamedTextColor.RED));
             return true;
         }
 
@@ -109,7 +111,7 @@ public class ItemAdminCommand extends AbstractPluginCommand {
         ItemStack itemToGive = customItem.createItemStack(amount);
 
         if (itemToGive == null || itemToGive.getType() == Material.AIR) {
-            sender.sendMessage(ChatColor.RED + "Failed to create item stack for '" + customItemId + "'. Check server logs.");
+            sender.sendMessage(Component.text("Failed to create item stack for '" + customItemId + "'. Check server logs.", NamedTextColor.RED));
             logger.severe("Failed to create valid ItemStack for CustomItem ID: " + customItemId + " in ItemAdminCommand.");
             return true;
         }

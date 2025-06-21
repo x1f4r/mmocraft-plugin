@@ -9,8 +9,10 @@ import com.x1f4r.mmocraft.skill.model.SkillType;
 import com.x1f4r.mmocraft.skill.service.SkillRegistryService;
 import com.x1f4r.mmocraft.util.StringUtil;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
+// import org.bukkit.ChatColor; // No longer needed
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
@@ -40,19 +42,19 @@ public class ExecuteSkillCommand extends AbstractPluginCommand {
     @Override
     public boolean onCommand(CommandSender sender, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage(ChatColor.RED + "This command can only be used by a player.");
+            sender.sendMessage(Component.text("This command can only be used by a player.", NamedTextColor.RED));
             return true;
         }
         Player casterPlayer = (Player) sender;
         PlayerProfile casterProfile = playerDataService.getPlayerProfile(casterPlayer.getUniqueId());
 
         if (casterProfile == null) {
-            casterPlayer.sendMessage(ChatColor.RED + "Your player data could not be found. Please try re-logging.");
+            casterPlayer.sendMessage(Component.text("Your player data could not be found. Please try re-logging.", NamedTextColor.RED));
             return true;
         }
 
         if (args.length < 1) {
-            casterPlayer.sendMessage(ChatColor.RED + "Usage: /useskill <skillId> [targetName]");
+            casterPlayer.sendMessage(Component.text("Usage: /useskill <skillId> [targetName]", NamedTextColor.RED));
             // Optionally list available skills if desired (could be spammy)
             // skillRegistryService.getAllSkills().forEach(skill -> casterPlayer.sendMessage(StringUtil.colorize("&e - " + skill.getSkillId() + " (&7" + skill.getSkillName() + "&7)")));
             return true;
@@ -62,7 +64,7 @@ public class ExecuteSkillCommand extends AbstractPluginCommand {
         Optional<Skill> optionalSkill = skillRegistryService.getSkill(skillId);
 
         if (optionalSkill.isEmpty()) {
-            casterPlayer.sendMessage(ChatColor.RED + "Skill '" + skillId + "' not found.");
+            casterPlayer.sendMessage(Component.text("Skill '" + skillId + "' not found.", NamedTextColor.RED));
             return true;
         }
 
@@ -88,7 +90,7 @@ public class ExecuteSkillCommand extends AbstractPluginCommand {
 
         if (skill.getSkillType() == SkillType.ACTIVE_TARGETED_ENTITY) {
             if (args.length < 2) {
-                casterPlayer.sendMessage(ChatColor.RED + "Usage: /useskill " + skillId + " <targetName>");
+                casterPlayer.sendMessage(Component.text("Usage: /useskill " + skillId + " <targetName>", NamedTextColor.RED));
                 return true;
             }
             String targetName = args[1];
@@ -102,17 +104,17 @@ public class ExecuteSkillCommand extends AbstractPluginCommand {
                     }
                 }
                 if (targetEntity == null) {
-                    casterPlayer.sendMessage(ChatColor.RED + "Target '" + targetName + "' not found or not online/nearby.");
+                    casterPlayer.sendMessage(Component.text("Target '" + targetName + "' not found or not online/nearby.", NamedTextColor.RED));
                     return true;
                 }
             }
             if (!(targetEntity instanceof LivingEntity)) {
-                 casterPlayer.sendMessage(ChatColor.RED + "Target must be a living entity.");
+                 casterPlayer.sendMessage(Component.text("Target must be a living entity.", NamedTextColor.RED));
                  return true;
             }
             if (targetEntity.equals(casterPlayer) && skill.getSkillType() != SkillType.ACTIVE_SELF) {
                  // Some targeted skills might allow self-targeting, others not.
-                 // casterPlayer.sendMessage(ChatColor.RED + "You cannot target yourself with " + skill.getSkillName());
+                 // casterPlayer.sendMessage(Component.text("You cannot target yourself with " + skill.getSkillName(), NamedTextColor.RED));
                  // return true;
             }
         } else if (skill.getSkillType() == SkillType.ACTIVE_AOE_POINT) {
@@ -138,7 +140,7 @@ public class ExecuteSkillCommand extends AbstractPluginCommand {
             // PlayerDataService save is not called here; assumed to be periodic or on quit.
             // Skills that change profile data (like MinorHeal changing health) modify the cached PlayerProfile.
         } catch (Exception e) {
-            casterPlayer.sendMessage(ChatColor.RED + "An error occurred while using the skill: " + e.getMessage());
+            casterPlayer.sendMessage(Component.text("An error occurred while using the skill: " + e.getMessage(), NamedTextColor.RED));
             plugin.getLoggingUtil().severe("Error executing skill " + skill.getSkillId() + " for " + casterPlayer.getName(), e);
         }
         return true;
