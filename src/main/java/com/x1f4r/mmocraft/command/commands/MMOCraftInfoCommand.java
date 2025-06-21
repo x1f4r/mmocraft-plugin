@@ -26,7 +26,7 @@ public class MMOCraftInfoCommand extends AbstractPluginCommand {
             @Override
             public boolean onCommand(CommandSender sender, String[] args) {
                 // Example of using logger if needed: logger.debug("Version subcommand executed by " + sender.getName());
-                sender.sendMessage(StringUtil.colorize("&6[MMOCraft] &bVersion: &f" + plugin.getDescription().getVersion()));
+                sender.sendMessage(StringUtil.colorize("&6[MMOCraft] &bVersion: &f" + plugin.getPluginMeta().getVersion()));
                 return true;
             }
 

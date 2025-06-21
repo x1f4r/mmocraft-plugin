@@ -124,7 +124,7 @@ public abstract class CustomItem {
             TextColor rarityColor = rarity.getTextColor();
             String itemName = StringUtil.stripColor(getDisplayName()); // Ensure base name is clean
             Component displayNameComponent = Component.text(itemName, rarityColor);
-            meta.setDisplayName(LegacyComponentSerializer.legacySection().serialize(displayNameComponent));
+            meta.displayName(displayNameComponent);
 
 
             // Set lore
@@ -163,7 +163,10 @@ public abstract class CustomItem {
             }
 
             if (!finalLore.isEmpty()) {
-                meta.setLore(finalLore);
+                List<Component> loreComponents = finalLore.stream()
+                        .map(line -> LegacyComponentSerializer.legacyAmpersand().deserialize(line))
+                        .collect(Collectors.toList());
+                meta.lore(loreComponents);
             }
 
             // Set custom model data

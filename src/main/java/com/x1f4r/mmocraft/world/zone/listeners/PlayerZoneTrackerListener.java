@@ -3,6 +3,8 @@ package com.x1f4r.mmocraft.world.zone.listeners;
 import com.x1f4r.mmocraft.eventbus.EventBusService;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import com.x1f4r.mmocraft.world.zone.event.PlayerEnterZoneEvent;
 import com.x1f4r.mmocraft.world.zone.event.PlayerLeaveZoneEvent;
 import com.x1f4r.mmocraft.world.zone.model.Zone;
@@ -91,7 +93,7 @@ public class PlayerZoneTrackerListener implements Listener {
         for (Zone newZone : zonesAtTo) {
             if (!previousZoneIds.contains(newZone.getZoneId().toLowerCase())) {
                 // Player entered newZone
-                player.sendActionBar(StringUtil.colorize("&eNow entering: " + newZone.getZoneName()));
+                player.sendActionBar(LegacyComponentSerializer.legacyAmpersand().deserialize("&eNow entering: " + newZone.getZoneName()));
                 // player.sendMessage(StringUtil.colorize("&eNow entering: " + newZone.getZoneName()));
                 eventBusService.call(new PlayerEnterZoneEvent(player, newZone));
                 logger.fine("Player " + player.getName() + " entered zone " + newZone.getZoneName());
@@ -103,7 +105,7 @@ public class PlayerZoneTrackerListener implements Listener {
             if (!currentZoneIds.contains(oldZoneId)) {
                 zoneManager.getZone(oldZoneId).ifPresent(oldZone -> {
                     // Player exited oldZone
-                    player.sendActionBar(StringUtil.colorize("&7Now leaving: " + oldZone.getZoneName()));
+                    player.sendActionBar(LegacyComponentSerializer.legacyAmpersand().deserialize("&7Now leaving: " + oldZone.getZoneName()));
                     // player.sendMessage(StringUtil.colorize("&7Now leaving: " + oldZone.getZoneName()));
                     eventBusService.call(new PlayerLeaveZoneEvent(player, oldZone));
                     logger.fine("Player " + player.getName() + " left zone " + oldZone.getZoneName());

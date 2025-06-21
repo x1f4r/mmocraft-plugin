@@ -6,6 +6,8 @@ import com.x1f4r.mmocraft.item.service.CustomItemRegistry; // For equipment
 import com.x1f4r.mmocraft.loot.service.LootService; // For assigning loot tables (metadata)
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import com.x1f4r.mmocraft.world.spawning.model.CustomSpawnRule;
 import com.x1f4r.mmocraft.world.spawning.model.MobSpawnDefinition;
 
@@ -168,7 +170,7 @@ public class BasicCustomSpawningService implements CustomSpawningService {
 
         // Apply custom name
         definition.getDisplayName().ifPresent(name -> {
-            livingEntity.setCustomName(StringUtil.colorize(name));
+            livingEntity.customName(LegacyComponentSerializer.legacyAmpersand().deserialize(name));
             livingEntity.setCustomNameVisible(true);
         });
 
