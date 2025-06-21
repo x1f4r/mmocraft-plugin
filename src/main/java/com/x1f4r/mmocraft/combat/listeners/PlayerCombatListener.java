@@ -9,7 +9,8 @@ import com.x1f4r.mmocraft.playerdata.PlayerDataService;
 import com.x1f4r.mmocraft.playerdata.model.PlayerProfile;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
-
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
@@ -134,10 +135,10 @@ public class PlayerCombatListener implements Listener {
         if (damageInstance.evaded()) {
             logger.info(StringUtil.colorize(attackerName + "'s attack on " + victimName + " was &eEVADED&f."));
             if (victim instanceof Player && damageInstance.victimProfile() != null) {
-                 ((Player) victim).sendActionBar(StringUtil.colorize("&7&oEvaded attack from " + attackerName));
+                 ((Player) victim).sendActionBar(LegacyComponentSerializer.legacyAmpersand().deserialize("&7&oEvaded attack from " + attackerName));
             }
              if (actualAttacker instanceof Player && damageInstance.attackerProfile() != null) {
-                 ((Player) actualAttacker).sendActionBar(StringUtil.colorize("&7&oYour attack was evaded by " + victimName));
+                 ((Player) actualAttacker).sendActionBar(LegacyComponentSerializer.legacyAmpersand().deserialize("&7&oYour attack was evaded by " + victimName));
             }
         } else {
             String critMessage = damageInstance.criticalHit() ? " &c(Critical!)&f" : "";

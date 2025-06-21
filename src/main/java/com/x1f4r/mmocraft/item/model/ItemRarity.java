@@ -1,44 +1,45 @@
 package com.x1f4r.mmocraft.item.model;
 
-import org.bukkit.ChatColor;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 
 /**
  * Represents the rarity of a custom item.
- * Each rarity has a display name (with color codes) and a corresponding ChatColor.
+ * Each rarity has a display name (with color codes) and a corresponding TextColor.
  */
 public enum ItemRarity {
-    COMMON("&fCommon", ChatColor.WHITE),
-    UNCOMMON("&aUncommon", ChatColor.GREEN),
-    RARE("&9Rare", ChatColor.BLUE), // Bukkit's BLUE is dark blue, AQUA is light blue
-    EPIC("&5Epic", ChatColor.DARK_PURPLE),
-    LEGENDARY("&6Legendary", ChatColor.GOLD),
-    MYTHIC("&cMythic", ChatColor.RED),
-    UNIQUE("&eUnique", ChatColor.YELLOW); // Added another common one
+    COMMON("&fCommon", NamedTextColor.WHITE),
+    UNCOMMON("&aUncommon", NamedTextColor.GREEN),
+    RARE("&9Rare", NamedTextColor.BLUE), // Adventure's BLUE is generally a bright blue. For dark blue, use DARK_BLUE.
+    EPIC("&5Epic", NamedTextColor.DARK_PURPLE),
+    LEGENDARY("&6Legendary", NamedTextColor.GOLD),
+    MYTHIC("&cMythic", NamedTextColor.RED),
+    UNIQUE("&eUnique", NamedTextColor.YELLOW);
 
-    private final String displayName;
-    private final ChatColor chatColor;
+    private final String displayName; // This still contains legacy codes like "&fCommon"
+    private final TextColor textColor;
 
-    ItemRarity(String displayName, ChatColor chatColor) {
+    ItemRarity(String displayName, TextColor textColor) {
         this.displayName = displayName;
-        this.chatColor = chatColor;
+        this.textColor = textColor;
     }
 
     /**
      * Gets the pre-colorized display name of the rarity (e.g., "&fCommon").
-     * Use with StringUtil.colorize() if needed again, but it's stored colorized.
-     * @return The display name with Minecraft color codes.
+     * This string contains legacy color codes.
+     * @return The display name with Minecraft legacy color codes.
      */
     public String getDisplayName() {
         return displayName;
     }
 
     /**
-     * Gets the {@link ChatColor} associated with this rarity.
-     * This can be used to prefix item names or for other color-related operations.
-     * @return The ChatColor for this rarity.
+     * Gets the {@link TextColor} associated with this rarity.
+     * This can be used for Adventure API components.
+     * @return The TextColor for this rarity.
      */
-    public ChatColor getChatColor() {
-        return chatColor;
+    public TextColor getTextColor() {
+        return textColor;
     }
 
     /**

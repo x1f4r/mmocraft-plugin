@@ -132,9 +132,10 @@ public class BasicPlayerDataService implements PlayerDataService {
         String coreStatsJson = JsonUtil.statsMapToJson(profile.getCoreStats());
         String sql;
         if (isNewProfile) {
-            if (profile.getFirstLogin() == null) {
-                profile.setLastLogin(LocalDateTime.now());
-            }
+            // PlayerProfile constructor initializes firstLogin and lastLogin,
+            // so profile.getFirstLogin() should not be null here.
+            // If it were, it should be profile.setFirstLogin(LocalDateTime.now());
+            // For now, assuming constructor handles it.
              sql = "INSERT INTO " + TABLE_NAME + " (player_uuid, player_name, current_health, max_health, " +
                       "current_mana, max_mana, level, experience, currency, core_stats, first_login, last_login) " +
                       "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
@@ -166,18 +167,16 @@ public class BasicPlayerDataService implements PlayerDataService {
         if (affectedRows > 0) {
             logger.fine("Successfully saved profile for " + profile.getPlayerName() + (isNewProfile ? " (new)" : " (update)"));
         } else {
-            logger.warning("Failed to save profile for " + profile.getPlayerName() + " (no rows affected, UUID: " + profile.getPlayerUUID() + ")");
-            String upsertSql = "INSERT OR REPLACE INTO " + TABLE_NAME + " (player_uuid, player_name, current_health, max_health, " +
-                  "current_mana, max_mana, level, experience, currency, core_stats, first_login, last_login) " +
-                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-             persistenceService.executeUpdate(upsertSql,
-                profile.getPlayerUUID().toString(), profile.getPlayerName(), profile.getCurrentHealth(), profile.getMaxHealth(),
-                profile.getCurrentMana(), profile.getMaxMana(), profile.getLevel(), profile.getExperience(),
-                profile.getCurrency(), coreStatsJson,
-                profile.getFirstLogin().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                profile.getLastLogin().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-            );
-            logger.info("Attempted UPSERT for " + profile.getPlayerName() + " after failed initial save.");
+            // If isNewProfile is true, this means the INSERT failed, which is a problem.
+            // If isNewProfile is false, this means the UPDATE failed (no row found for UUID), also a problem.
+            String operationType = isNewProfile ? "insert new" : "update existing";
+            logger.severe("Failed to " + operationType + " profile for " + profile.getPlayerName() +
+                          " (no rows affected, UUID: " + profile.getPlayerUUID() + "). " +
+                          "This may indicate a data consistency issue or a problem with the database operation.");
+            // Consider if any fallback or specific error handling is needed beyond logging.
+            // For now, throwing the original SQLException or a new specific one might be appropriate if the caller should handle it.
+            // However, this method is called from async tasks, so throwing might just get logged by CompletableFuture.
+            // For critical save operations, a more robust alerting or recovery mechanism might be needed in a production system.
         }
     }
 

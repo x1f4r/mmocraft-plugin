@@ -12,6 +12,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Sound;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -67,7 +68,8 @@ public class MinorHealSkill extends Skill {
         long actualHeal = casterProfile.getCurrentHealth() - oldHealth;
 
         // Update Bukkit's health for the player
-        double newBukkitHealth = Math.min(casterPlayer.getMaxHealth(), casterPlayer.getHealth() + actualHeal);
+        double maxHealth = casterPlayer.getAttribute(Attribute.MAX_HEALTH).getValue();
+        double newBukkitHealth = Math.min(maxHealth, casterPlayer.getHealth() + actualHeal);
         casterPlayer.setHealth(newBukkitHealth);
 
         casterPlayer.sendMessage(StringUtil.colorize("&aYou cast " + getSkillName() + " and healed yourself for &f" + String.format("%.1f", (double)actualHeal) + "&a health."));

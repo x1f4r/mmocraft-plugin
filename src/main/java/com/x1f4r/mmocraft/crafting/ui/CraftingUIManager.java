@@ -7,6 +7,8 @@ import com.x1f4r.mmocraft.playerdata.PlayerDataService;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -38,7 +40,7 @@ public class CraftingUIManager implements Listener { // Implement Listener to ha
     // Map to track players who have the custom crafting UI open
     private final Map<UUID, Inventory> openCraftingUIs = new ConcurrentHashMap<>();
 
-    private static final String CRAFTING_UI_TITLE = StringUtil.colorize("&8Custom Crafting Table");
+    private static final Component CRAFTING_UI_TITLE = LegacyComponentSerializer.legacyAmpersand().deserialize("&8Custom Crafting Table");
     private static final int CRAFTING_GRID_SIZE = 3 * 3; // 3x3 grid
     // TODO: Define slot indices for grid, result, and other UI elements
 
@@ -71,7 +73,7 @@ public class CraftingUIManager implements Listener { // Implement Listener to ha
         ItemStack filler = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         ItemMeta fillerMeta = filler.getItemMeta();
         if (fillerMeta != null) {
-            fillerMeta.setDisplayName(" ");
+            fillerMeta.displayName(Component.text(" "));
             filler.setItemMeta(fillerMeta);
         }
         for (int i = 0; i < craftingInv.getSize(); i++) {
@@ -84,7 +86,7 @@ public class CraftingUIManager implements Listener { // Implement Listener to ha
         ItemStack craftButton = new ItemStack(Material.ANVIL);
         ItemMeta craftMeta = craftButton.getItemMeta();
         if(craftMeta != null) {
-            craftMeta.setDisplayName(StringUtil.colorize("&aCraft Item"));
+            craftMeta.displayName(LegacyComponentSerializer.legacyAmpersand().deserialize("&aCraft Item"));
             craftButton.setItemMeta(craftMeta);
         }
         craftingInv.setItem(getCraftButtonSlotIndex(), craftButton);

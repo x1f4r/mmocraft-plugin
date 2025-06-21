@@ -9,8 +9,10 @@ import com.x1f4r.mmocraft.playerdata.model.Stat;
 import com.x1f4r.mmocraft.playerdata.util.ExperienceUtil;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
+// import org.bukkit.ChatColor; // No longer needed
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -120,21 +122,21 @@ public class PlayerDataAdminCommand extends AbstractPluginCommand {
 
     private boolean executeView(CommandSender sender, String[] args) {
         if (!sender.hasPermission(PERM_VIEW)) {
-            sender.sendMessage(ChatColor.RED + "You don't have permission for this command.");
+            sender.sendMessage(Component.text("You don't have permission for this command.", NamedTextColor.RED));
             return true;
         }
         if (args.length < 1) {
-            sender.sendMessage(ChatColor.RED + "Usage: /pd view <playerName>");
+            sender.sendMessage(Component.text("Usage: /pd view <playerName>", NamedTextColor.RED));
             return true;
         }
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(ChatColor.RED + "Player '" + args[0] + "' not found or not online.");
+            sender.sendMessage(Component.text("Player '" + args[0] + "' not found or not online.", NamedTextColor.RED));
             return true;
         }
         PlayerProfile profile = playerDataService.getPlayerProfile(target.getUniqueId());
         if (profile == null) {
-            sender.sendMessage(ChatColor.RED + "PlayerProfile for '" + args[0] + "' not found in cache (should be if online).");
+            sender.sendMessage(Component.text("PlayerProfile for '" + args[0] + "' not found in cache (should be if online).", NamedTextColor.RED));
             return true;
         }
 
@@ -162,21 +164,21 @@ public class PlayerDataAdminCommand extends AbstractPluginCommand {
 
     private boolean executeSetStat(CommandSender sender, String[] args) {
         if (!sender.hasPermission(PERM_SETSTAT)) {
-            sender.sendMessage(ChatColor.RED + "You don't have permission for this command.");
+            sender.sendMessage(Component.text("You don't have permission for this command.", NamedTextColor.RED));
             return true;
         }
         if (args.length < 3) {
-            sender.sendMessage(ChatColor.RED + "Usage: /pd setstat <playerName> <statName> <value>");
+            sender.sendMessage(Component.text("Usage: /pd setstat <playerName> <statName> <value>", NamedTextColor.RED));
             return true;
         }
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(ChatColor.RED + "Player '" + args[0] + "' not found or not online.");
+            sender.sendMessage(Component.text("Player '" + args[0] + "' not found or not online.", NamedTextColor.RED));
             return true;
         }
         PlayerProfile profile = playerDataService.getPlayerProfile(target.getUniqueId());
         if (profile == null) {
-            sender.sendMessage(ChatColor.RED + "PlayerProfile for '" + args[0] + "' not found.");
+            sender.sendMessage(Component.text("PlayerProfile for '" + args[0] + "' not found.", NamedTextColor.RED));
             return true;
         }
 
@@ -184,8 +186,8 @@ public class PlayerDataAdminCommand extends AbstractPluginCommand {
         try {
             statToSet = Stat.valueOf(args[1].toUpperCase());
         } catch (IllegalArgumentException e) {
-            sender.sendMessage(ChatColor.RED + "Invalid stat name: " + args[1]);
-            sender.sendMessage(ChatColor.YELLOW + "Available stats: " + Arrays.stream(Stat.values()).map(Enum::name).collect(Collectors.joining(", ")));
+            sender.sendMessage(Component.text("Invalid stat name: " + args[1], NamedTextColor.RED));
+            sender.sendMessage(Component.text("Available stats: " + Arrays.stream(Stat.values()).map(Enum::name).collect(Collectors.joining(", ")), NamedTextColor.YELLOW));
             return true;
         }
 
@@ -193,7 +195,7 @@ public class PlayerDataAdminCommand extends AbstractPluginCommand {
         try {
             value = Double.parseDouble(args[2]);
         } catch (NumberFormatException e) {
-            sender.sendMessage(ChatColor.RED + "Invalid value: " + args[2] + ". Must be a number.");
+            sender.sendMessage(Component.text("Invalid value: " + args[2] + ". Must be a number.", NamedTextColor.RED));
             return true;
         }
 
@@ -207,21 +209,21 @@ public class PlayerDataAdminCommand extends AbstractPluginCommand {
 
     private boolean executeSetLevel(CommandSender sender, String[] args) {
         if (!sender.hasPermission(PERM_SETLEVEL)) {
-            sender.sendMessage(ChatColor.RED + "You don't have permission for this command.");
+            sender.sendMessage(Component.text("You don't have permission for this command.", NamedTextColor.RED));
             return true;
         }
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.RED + "Usage: /pd setlevel <playerName> <level>");
+            sender.sendMessage(Component.text("Usage: /pd setlevel <playerName> <level>", NamedTextColor.RED));
             return true;
         }
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(ChatColor.RED + "Player '" + args[0] + "' not found or not online.");
+            sender.sendMessage(Component.text("Player '" + args[0] + "' not found or not online.", NamedTextColor.RED));
             return true;
         }
         PlayerProfile profile = playerDataService.getPlayerProfile(target.getUniqueId());
         if (profile == null) {
-            sender.sendMessage(ChatColor.RED + "PlayerProfile for '" + args[0] + "' not found.");
+            sender.sendMessage(Component.text("PlayerProfile for '" + args[0] + "' not found.", NamedTextColor.RED));
             return true;
         }
 
@@ -229,12 +231,12 @@ public class PlayerDataAdminCommand extends AbstractPluginCommand {
         try {
             newLevel = Integer.parseInt(args[1]);
         } catch (NumberFormatException e) {
-            sender.sendMessage(ChatColor.RED + "Invalid level: " + args[1] + ". Must be an integer.");
+            sender.sendMessage(Component.text("Invalid level: " + args[1] + ". Must be an integer.", NamedTextColor.RED));
             return true;
         }
 
         if (newLevel < ExperienceUtil.getMinLevel() || newLevel > ExperienceUtil.getMaxLevel()) {
-            sender.sendMessage(ChatColor.RED + "Level must be between " + ExperienceUtil.getMinLevel() + " and " + ExperienceUtil.getMaxLevel() + ".");
+            sender.sendMessage(Component.text("Level must be between " + ExperienceUtil.getMinLevel() + " and " + ExperienceUtil.getMaxLevel() + ".", NamedTextColor.RED));
             return true;
         }
 
@@ -249,16 +251,16 @@ public class PlayerDataAdminCommand extends AbstractPluginCommand {
 
     private boolean executeAddXp(CommandSender sender, String[] args) {
         if (!sender.hasPermission(PERM_ADDXP)) {
-            sender.sendMessage(ChatColor.RED + "You don't have permission for this command.");
+            sender.sendMessage(Component.text("You don't have permission for this command.", NamedTextColor.RED));
             return true;
         }
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.RED + "Usage: /pd addxp <playerName> <amount>");
+            sender.sendMessage(Component.text("Usage: /pd addxp <playerName> <amount>", NamedTextColor.RED));
             return true;
         }
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(ChatColor.RED + "Player '" + args[0] + "' not found or not online.");
+            sender.sendMessage(Component.text("Player '" + args[0] + "' not found or not online.", NamedTextColor.RED));
             return true;
         }
         // PlayerDataService handles profile null check for addExperience
@@ -267,11 +269,11 @@ public class PlayerDataAdminCommand extends AbstractPluginCommand {
         try {
             amount = Long.parseLong(args[1]);
         } catch (NumberFormatException e) {
-            sender.sendMessage(ChatColor.RED + "Invalid amount: " + args[1] + ". Must be an integer.");
+            sender.sendMessage(Component.text("Invalid amount: " + args[1] + ". Must be an integer.", NamedTextColor.RED));
             return true;
         }
         if (amount <= 0) {
-            sender.sendMessage(ChatColor.RED + "XP amount must be positive.");
+            sender.sendMessage(Component.text("XP amount must be positive.", NamedTextColor.RED));
             return true;
         }
 
@@ -285,21 +287,21 @@ public class PlayerDataAdminCommand extends AbstractPluginCommand {
 
     private boolean executeAddCurrency(CommandSender sender, String[] args) {
         if (!sender.hasPermission(PERM_ADDCURRENCY)) {
-            sender.sendMessage(ChatColor.RED + "You don't have permission for this command.");
+            sender.sendMessage(Component.text("You don't have permission for this command.", NamedTextColor.RED));
             return true;
         }
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.RED + "Usage: /pd addcurrency <playerName> <amount>");
+            sender.sendMessage(Component.text("Usage: /pd addcurrency <playerName> <amount>", NamedTextColor.RED));
             return true;
         }
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(ChatColor.RED + "Player '" + args[0] + "' not found or not online.");
+            sender.sendMessage(Component.text("Player '" + args[0] + "' not found or not online.", NamedTextColor.RED));
             return true;
         }
         PlayerProfile profile = playerDataService.getPlayerProfile(target.getUniqueId());
         if (profile == null) {
-            sender.sendMessage(ChatColor.RED + "PlayerProfile for '" + args[0] + "' not found.");
+            sender.sendMessage(Component.text("PlayerProfile for '" + args[0] + "' not found.", NamedTextColor.RED));
             return true;
         }
 
@@ -307,7 +309,7 @@ public class PlayerDataAdminCommand extends AbstractPluginCommand {
         try {
             amount = Long.parseLong(args[1]);
         } catch (NumberFormatException e) {
-            sender.sendMessage(ChatColor.RED + "Invalid amount: " + args[1] + ". Must be an integer.");
+            sender.sendMessage(Component.text("Invalid amount: " + args[1] + ". Must be an integer.", NamedTextColor.RED));
             return true;
         }
         // Allow negative amounts to subtract currency, or add check if only positive
