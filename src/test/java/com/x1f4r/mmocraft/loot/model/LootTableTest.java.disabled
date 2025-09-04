@@ -1,0 +1,113 @@
+package com.x1f4r.mmocraft.loot.model;
+
+import com.x1f4r.mmocraft.core.MMOCraftPlugin;
+import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
+import com.x1f4r.mmocraft.util.LoggingUtil;
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class LootTableTest {
+
+    @Mock
+    private MMOCraftPlugin mockPlugin;
+    @Mock
+    private CustomItemRegistry mockItemRegistry;
+    @Mock
+    private LoggingUtil mockLogger;
+
+    @BeforeEach
+    void setUp() {
+        // Provide the logger mock whenever the plugin instance is asked for it.
+        when(mockPlugin.getLoggingUtil()).thenReturn(mockLogger);
+    }
+
+    @Test
+    void generateLoot_shouldReturnBothVanillaAndCustomItems() {
+        // Arrange
+        LootTableEntry vanillaEntry = new LootTableEntry(LootType.VANILLA, "DIAMOND", 1.0, 1, 1);
+        LootTableEntry customEntry = new LootTableEntry(LootType.CUSTOM, "magic_sword", 1.0, 1, 1);
+        LootTable lootTable = new LootTable("test_table", List.of(vanillaEntry, customEntry));
+
+        ItemStack magicSwordStack = new ItemStack(Material.DIAMOND_SWORD, 1);
+        when(mockItemRegistry.createItemStack(eq("magic_sword"), anyInt())).thenReturn(magicSwordStack);
+
+        // Act
+        List<ItemStack> generatedLoot = lootTable.generateLoot(mockItemRegistry, mockPlugin);
+
+        // Assert
+        assertEquals(2, generatedLoot.size(), "Should have generated two items.");
+        assertTrue(generatedLoot.stream().anyMatch(item -> item.getType() == Material.DIAMOND), "Loot should contain a vanilla diamond.");
+        assertTrue(generatedLoot.stream().anyMatch(item -> item.getType() == Material.DIAMOND_SWORD), "Loot should contain the custom magic sword.");
+    }
+
+    @Test
+    void generateLoot_shouldReturnEmptyListWhenDropChanceIsZero() {
+        // Arrange
+        LootTableEntry entry = new LootTableEntry(LootType.VANILLA, "GOLD_INGOT", 0.0, 1, 1);
+        LootTable lootTable = new LootTable("test_table_no_drops", List.of(entry));
+
+        // Act
+        List<ItemStack> generatedLoot = lootTable.generateLoot(mockItemRegistry, mockPlugin);
+
+        // Assert
+        assertTrue(generatedLoot.isEmpty(), "No items should drop when drop chance is 0.");
+    }
+
+    @Test
+    void generateLoot_shouldHandleInvalidVanillaMaterialGracefullyAndLogWarning() {
+        // Arrange
+        LootTableEntry invalidVanillaEntry = new LootTableEntry(LootType.VANILLA, "INVALID_MATERIAL_NAME", 1.0, 1, 1);
+        LootTable lootTable = new LootTable("test_table_invalid_vanilla", List.of(invalidVanillaEntry));
+
+        // Act
+        List<ItemStack> generatedLoot = lootTable.generateLoot(mockItemRegistry, mockPlugin);
+
+        // Assert
+        assertTrue(generatedLoot.isEmpty(), "Invalid vanilla material should result in no item being generated.");
+        verify(mockLogger).warning(contains("invalid VANILLA material identifier: INVALID_MATERIAL_NAME"));
+    }
+
+    @Test
+    void generateLoot_shouldHandleNonExistentCustomItemGracefullyAndLogWarning() {
+        // Arrange
+        LootTableEntry invalidCustomEntry = new LootTableEntry(LootType.CUSTOM, "non_existent_item", 1.0, 1, 1);
+        LootTable lootTable = new LootTable("test_table_invalid_custom", List.of(invalidCustomEntry));
+        when(mockItemRegistry.createItemStack(eq("non_existent_item"), anyInt())).thenReturn(null);
+
+        // Act
+        List<ItemStack> generatedLoot = lootTable.generateLoot(mockItemRegistry, mockPlugin);
+
+        // Assert
+        assertTrue(generatedLoot.isEmpty(), "Invalid custom item should result in no item being generated.");
+        verify(mockLogger).warning(contains("failed to create CUSTOM item with id 'non_existent_item'"));
+    }
+
+    @Test
+    void generateLoot_shouldRespectRandomAmount() {
+        // Arrange
+        LootTableEntry vanillaEntry = new LootTableEntry(LootType.VANILLA, "IRON_INGOT", 1.0, 5, 10);
+        LootTable lootTable = new LootTable("test_table_random_amount", List.of(vanillaEntry));
+
+        // Act
+        List<ItemStack> generatedLoot = lootTable.generateLoot(mockItemRegistry, mockPlugin);
+
+        // Assert
+        assertEquals(1, generatedLoot.size());
+        ItemStack ironStack = generatedLoot.get(0);
+        assertEquals(Material.IRON_INGOT, ironStack.getType());
+        assertTrue(ironStack.getAmount() >= 5 && ironStack.getAmount() <= 10, "Amount should be between 5 and 10, but was " + ironStack.getAmount());
+    }
+}
