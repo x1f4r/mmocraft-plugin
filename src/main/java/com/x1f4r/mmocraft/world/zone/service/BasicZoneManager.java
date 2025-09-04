@@ -1,41 +1,87 @@
 package com.x1f4r.mmocraft.world.zone.service;
 
-import com.x1f4r.mmocraft.core.MMOCraftPlugin; // Not strictly needed if only logger/eventbus passed
+import com.x1f4r.mmocraft.config.ConfigManager;
+import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.eventbus.EventBusService;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.world.zone.model.Zone;
-
 import org.bukkit.Location;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class BasicZoneManager implements ZoneManager {
 
+    private final MMOCraftPlugin plugin;
     private final LoggingUtil logger;
-    private final EventBusService eventBusService; // For firing PlayerEnterZoneEvent/PlayerLeaveZoneEvent
+    private final EventBusService eventBusService;
 
     private final Map<String, Zone> zonesById = new ConcurrentHashMap<>();
-    // Cache for player's current zones to avoid re-calculating on every minor move.
     private final Map<UUID, Set<String>> playerCurrentZoneIds = new ConcurrentHashMap<>();
 
-
     public BasicZoneManager(MMOCraftPlugin plugin, LoggingUtil logger, EventBusService eventBusService) {
-        // this.plugin = plugin; // Store if needed for other Bukkit services directly
+        this.plugin = plugin;
         this.logger = logger;
         this.eventBusService = eventBusService;
         logger.debug("BasicZoneManager initialized.");
     }
+
+    @Override
+    public void loadZones() {
+        ConfigManager zoneConfigManager = new ConfigManager(plugin, "zones.yml", logger);
+        ConfigurationSection root = zoneConfigManager.getConfig();
+        zonesById.clear();
+        logger.info("Loading zones from zones.yml...");
+
+        if (root == null) {
+            logger.warning("zones.yml is empty or could not be read. No zones will be loaded.");
+            return;
+        }
+
+        int loadedCount = 0;
+        for (String zoneId : root.getKeys(false)) {
+            String path = zoneId;
+            if (!root.isConfigurationSection(path)) {
+                logger.warning("Skipping non-section entry '" + zoneId + "' in zones.yml.");
+                continue;
+            }
+
+            try {
+                String name = root.getString(path + ".name", "Unnamed Zone");
+                String world = root.getString(path + ".world");
+                if (world == null || world.isBlank()) {
+                    logger.severe("Zone '" + zoneId + "' is missing required 'world' property. Skipping.");
+                    continue;
+                }
+
+                int minX = root.getInt(path + ".min-x");
+                int minY = root.getInt(path + ".min-y");
+                int minZ = root.getInt(path + ".min-z");
+                int maxX = root.getInt(path + ".max-x");
+                int maxZ = root.getInt(path + ".max-z");
+                int maxY = root.getInt(path + ".max-y", 256);
+
+                Map<String, Object> properties = new HashMap<>();
+                ConfigurationSection propertiesSection = root.getConfigurationSection(path + ".properties");
+                if (propertiesSection != null) {
+                    for (String key : propertiesSection.getKeys(false)) {
+                        properties.put(key, propertiesSection.get(key));
+                    }
+                }
+
+                Zone zone = new Zone(zoneId, name, world, minX, minY, minZ, maxX, maxY, maxZ, properties);
+                registerZone(zone);
+                loadedCount++;
+            } catch (Exception e) {
+                logger.severe("Failed to load zone with ID '" + zoneId + "' from zones.yml. Please check configuration.", e);
+            }
+        }
+        logger.info("Successfully loaded " + loadedCount + " zones.");
+    }
+
 
     @Override
     public void registerZone(Zone zone) {
@@ -57,7 +103,6 @@ public class BasicZoneManager implements ZoneManager {
         Zone removed = zonesById.remove(zoneId.toLowerCase());
         if (removed != null) {
             logger.info("Unregistered zone: " + removed.getZoneName() + " (ID: " + zoneId + ")");
-            // Also remove this zoneId from all players' current zones if they were in it
             playerCurrentZoneIds.values().forEach(set -> set.remove(zoneId.toLowerCase()));
         }
     }
@@ -97,7 +142,7 @@ public class BasicZoneManager implements ZoneManager {
             return Collections.emptyList();
         }
         return zoneIds.stream()
-                      .map(this::getZone) // Uses the lowercase ID from the cache
+                      .map(this::getZone)
                       .filter(Optional::isPresent)
                       .map(Optional::get)
                       .collect(Collectors.toList());
@@ -109,7 +154,6 @@ public class BasicZoneManager implements ZoneManager {
         if (currentZoneIds == null || currentZoneIds.isEmpty()) {
             playerCurrentZoneIds.remove(playerUUID);
         } else {
-            // Store lowercase IDs for consistent lookup
             Set<String> lowerCaseZoneIds = currentZoneIds.stream().map(String::toLowerCase).collect(Collectors.toSet());
             playerCurrentZoneIds.put(playerUUID, new HashSet<>(lowerCaseZoneIds));
         }

@@ -1,0 +1,42 @@
+# ----------------------------------------------------------------
+# MMOCraft Zone Configuration
+#
+# Defines distinct areas in your worlds with special properties.
+# ----------------------------------------------------------------
+
+# Each top-level key is a unique ID for the zone.
+spawn_sanctuary:
+  # A user-friendly name for the zone.
+  name: "Spawn Sanctuary"
+  # The world this zone is located in.
+  world: "world"
+  # The coordinates defining the zone's bounding box.
+  min-x: -50
+  min-y: 0
+  min-z: -50
+  max-x: 50
+  max-y: 128
+  max-z: 50
+  # A map of custom properties for this zone.
+  # These can be used by listeners to change game mechanics.
+  # For example, isSanctuary: true, pvpAllowed: false
+  properties:
+    isSanctuary: true
+    pvpAllowed: false
+
+# You can add more zones here. For example:
+#
+# goblin_forest:
+#   name: "Goblin Forest"
+#   world: "world"
+#   min-x: 100
+#   min-y: 60
+#   min-z: 200
+#   max-x: 300
+#   max-y: 100
+#   max-z: 400
+#   properties:
+#     mobSpawnArea: true
+#     spawnableMobs:
+#       - "goblin_scout"
+#       - "goblin_shaman"

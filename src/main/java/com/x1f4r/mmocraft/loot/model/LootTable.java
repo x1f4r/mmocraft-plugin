@@ -55,45 +55,53 @@ public class LootTable {
     /**
      * Generates a list of ItemStacks based on the drop chances and amounts defined in this loot table.
      *
-     * @param itemRegistry The {@link CustomItemRegistry} used to create {@link ItemStack}s from custom item IDs.
-     * @param plugin The {@link MMOCraftPlugin} instance, potentially needed by item creation or NBT utilities.
+     * @param itemRegistry The {@link CustomItemRegistry} used to create {@link ItemStack}s for custom items.
+     * @param plugin The {@link MMOCraftPlugin} instance, used for logging.
      * @return A list of {@link ItemStack}s that were determined to drop. The list may be empty.
      */
     public List<ItemStack> generateLoot(CustomItemRegistry itemRegistry, MMOCraftPlugin plugin) {
         List<ItemStack> generatedItems = new ArrayList<>();
-        if (itemRegistry == null) {
-            // Consider logging this error through a passed logger or plugin instance
-            System.err.println("LootTable.generateLoot: CustomItemRegistry is null! Cannot generate loot.");
+        if (itemRegistry == null || plugin == null || plugin.getLoggingUtil() == null) {
+            System.err.println("LootTable.generateLoot: A required service (itemRegistry, plugin, or logger) is null! Cannot generate loot.");
             return generatedItems;
         }
 
         for (LootTableEntry entry : entries) {
-            if (random.nextDouble() < entry.dropChance()) { // Check if the item drops
-                int amountToDrop = entry.minAmount();
-                if (entry.maxAmount() > entry.minAmount()) {
-                    amountToDrop = random.nextInt((entry.maxAmount() - entry.minAmount()) + 1) + entry.minAmount();
+            if (random.nextDouble() >= entry.dropChance()) {
+                continue; // The roll failed, move to the next entry.
+            }
+
+            int amountToDrop = entry.minAmount();
+            if (entry.maxAmount() > entry.minAmount()) {
+                amountToDrop = random.nextInt((entry.maxAmount() - entry.minAmount()) + 1) + entry.minAmount();
+            }
+
+            ItemStack itemStack = null;
+            try {
+                switch (entry.type()) {
+                    case CUSTOM:
+                        itemStack = itemRegistry.createItemStack(entry.identifier(), amountToDrop);
+                        if (itemStack == null) {
+                            plugin.getLoggingUtil().warning("LootTable '" + lootTableId + "' failed to create CUSTOM item with id '" + entry.identifier() + "'. It was not found in the registry.");
+                        }
+                        break;
+
+                    case VANILLA:
+                        org.bukkit.Material material = org.bukkit.Material.matchMaterial(entry.identifier());
+                        if (material != null && !material.isAir()) {
+                            itemStack = new ItemStack(material, amountToDrop);
+                        } else {
+                            plugin.getLoggingUtil().warning("LootTable '" + lootTableId + "' contains an invalid VANILLA material identifier: " + entry.identifier());
+                        }
+                        break;
                 }
 
-                try {
-                    ItemStack itemStack = itemRegistry.createItemStack(entry.customItemId(), amountToDrop);
-                    if (itemStack != null && itemStack.getType() != org.bukkit.Material.AIR) {
-                        generatedItems.add(itemStack);
-                    } else {
-                        // Log warning if item ID is valid but createItemStack returns AIR/null
-                         if (plugin != null && plugin.getLoggingUtil() != null) {
-                            plugin.getLoggingUtil().warning("LootTable '" + lootTableId + "' generated AIR/null for customItemId: " + entry.customItemId());
-                        } else {
-                             System.err.println("LootTable '" + lootTableId + "' generated AIR/null for customItemId: " + entry.customItemId());
-                         }
-                    }
-                } catch (IllegalArgumentException e) {
-                    // This typically means the item ID was not found in the registry
-                    if (plugin != null && plugin.getLoggingUtil() != null) {
-                        plugin.getLoggingUtil().warning("LootTable '" + lootTableId + "' failed to create item: " + e.getMessage());
-                    } else {
-                        System.err.println("LootTable '" + lootTableId + "' failed to create item: " + e.getMessage());
-                    }
+                if (itemStack != null && itemStack.getType() != org.bukkit.Material.AIR) {
+                    generatedItems.add(itemStack);
                 }
+
+            } catch (Exception e) {
+                plugin.getLoggingUtil().severe("LootTable '" + lootTableId + "' encountered an unexpected error while generating loot for identifier '" + entry.identifier() + "': " + e.getMessage(), e);
             }
         }
         return generatedItems;
