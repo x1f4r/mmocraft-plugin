@@ -442,7 +442,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
 
         // 2. Define the conditions for the spawn rule
         List<SpawnCondition> conditions = List.of(
-                new BiomeCondition(List.of(Biome.PLAINS, Biome.MEADOW, Biome.SAVANNA)),
+                new BiomeCondition(Set.of(Biome.PLAINS, Biome.MEADOW, Biome.SAVANNA)),
                 new TimeCondition(13000, 23000) // Night time
         );
 
@@ -460,8 +460,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
         );
 
         // 4. Register the rule with the service
-        customSpawningService.addRule(warriorRule);
-        loggingUtil.info("Registered custom spawn rule: " + warriorRule.getRuleId());
+        customSpawningService.registerRule(warriorRule);
     }
 
     public void reloadPluginConfig() {

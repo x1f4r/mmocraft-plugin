@@ -197,7 +197,7 @@ public class PlayerProfile {
     // setMaxMana is now implicitly handled by recalculateDerivedAttributes via stats/level
 
     public void setLevel(int level) {
-        this.level = Math.max(1, level);
+        this.level = Math.max(1, Math.min(level, ExperienceUtil.getMaxLevel()));
         recalculateDerivedAttributes(); // Level change can affect max health/mana
     }
     public void setExperience(long experience) { this.experience = Math.max(0, experience); }

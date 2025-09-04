@@ -16,6 +16,11 @@ import java.util.UUID;
 public interface ZoneManager {
 
     /**
+     * Loads or reloads all zones from the configuration source.
+     */
+    void loadZones();
+
+    /**
      * Registers a new zone.
      * @param zone The Zone to register.
      */

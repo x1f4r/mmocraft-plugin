@@ -1,6 +1,6 @@
 plugins {
     id("java")
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("com.gradleup.shadow") version "9.1.0"
 }
 
 group = "com.x1f4r.mmocraft"
@@ -46,13 +46,13 @@ tasks.withType<Test> {
     testLogging {
         events("passed", "skipped", "failed")
     }
-    // Disable running tests by default to speed up CI
-    enabled = false
+    // Re-enable tests
+    enabled = true
 }
 
 sourceSets {
-    // Skip compiling test sources when tests are disabled
+    // Re-enable the test source directory
     named("test") {
-        java.setSrcDirs(emptyList<String>())
+        java.setSrcDirs(listOf("src/test/java"))
     }
 }
