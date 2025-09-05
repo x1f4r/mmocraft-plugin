@@ -13,7 +13,7 @@ repositories {
 
 dependencies {
     compileOnly("org.purpurmc.purpur:purpur-api:1.21.5-R0.1-SNAPSHOT")
-    implementation("org.xerial:sqlite-jdbc:3.45.3.0") // Added SQLite JDBC driver
+    implementation("org.xerial:sqlite-jdbc:3.46.0.0") // Updated SQLite JDBC driver
 
     // Testing dependencies
     testImplementation("org.purpurmc.purpur:purpur-api:1.21.5-R0.1-SNAPSHOT")

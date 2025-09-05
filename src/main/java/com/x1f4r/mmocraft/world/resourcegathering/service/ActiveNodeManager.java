@@ -1,20 +1,19 @@
 package com.x1f4r.mmocraft.world.resourcegathering.service;
 
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
-import com.x1f4r.mmocraft.item.service.CustomItemRegistry; // Not directly used in this impl, but good for context
-import com.x1f4r.mmocraft.loot.service.LootService;       // Not directly used in this impl, but good for context
+import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
+import com.x1f4r.mmocraft.loot.service.LootService;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.world.resourcegathering.model.ActiveResourceNode;
 import com.x1f4r.mmocraft.world.resourcegathering.model.ResourceNodeType;
-
+import com.x1f4r.mmocraft.world.resourcegathering.persistence.ResourceNodeRepository;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
-import org.bukkit.inventory.ItemStack; // If we drop items directly, not via LootService here
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ActiveNodeManager {
@@ -22,20 +21,45 @@ public class ActiveNodeManager {
     private final MMOCraftPlugin plugin;
     private final LoggingUtil logger;
     private final ResourceNodeRegistryService nodeRegistryService;
-    // private final LootService lootService; // Needed for dropping items if not handled by listener
-    // private final CustomItemRegistry customItemRegistry; // Same as above
+    private final ResourceNodeRepository resourceNodeRepository;
 
     private final Map<Location, ActiveResourceNode> activeNodes = new ConcurrentHashMap<>();
-    private final Material depletedMaterial = Material.BEDROCK; // Or COBBLESTONE, STONE etc.
+    private final Material depletedMaterial = Material.BEDROCK;
 
     public ActiveNodeManager(MMOCraftPlugin plugin, LoggingUtil logger,
                              ResourceNodeRegistryService nodeRegistryService,
+                             ResourceNodeRepository resourceNodeRepository,
                              LootService lootService, CustomItemRegistry customItemRegistry) {
         this.plugin = plugin;
         this.logger = logger;
         this.nodeRegistryService = nodeRegistryService;
-        // this.lootService = lootService;
-        // this.customItemRegistry = customItemRegistry;
+        this.resourceNodeRepository = resourceNodeRepository;
+        loadNodes();
+    }
+
+    private void loadNodes() {
+        logger.info("Loading active resource nodes from database...");
+        Map<Location, ActiveResourceNode> loadedNodes = resourceNodeRepository.loadAllNodes();
+        activeNodes.putAll(loadedNodes);
+        logger.info("Finished loading " + activeNodes.size() + " nodes. Verifying world state...");
+
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            for (ActiveResourceNode node : activeNodes.values()) {
+                Optional<ResourceNodeType> nodeTypeOpt = nodeRegistryService.getNodeType(node.getNodeTypeId());
+                if (nodeTypeOpt.isEmpty()) {
+                    logger.warning("Could not verify world state for node at " + blockLocationToString(node.getLocation()) + " because its type '" + node.getNodeTypeId() + "' is no longer registered. Skipping.");
+                    continue;
+                }
+                ResourceNodeType nodeType = nodeTypeOpt.get();
+                Block block = node.getLocation().getBlock();
+                Material expectedMaterial = node.isDepleted() ? depletedMaterial : nodeType.getDisplayMaterial();
+                if (block.getType() != expectedMaterial) {
+                    logger.debug("Correcting block state for node at " + blockLocationToString(node.getLocation()) + ". Was " + block.getType() + ", expected " + expectedMaterial);
+                    block.setType(expectedMaterial);
+                }
+            }
+            logger.info("World state verification complete.");
+        });
     }
 
     public void placeNewNode(Location location, String nodeTypeId) {
@@ -49,8 +73,6 @@ public class ActiveNodeManager {
             return;
         }
         ResourceNodeType nodeType = nodeTypeOpt.get();
-
-        // Ensure location is block-snapped for consistent map keys
         Location blockLocation = location.getBlock().getLocation();
 
         if (activeNodes.containsKey(blockLocation)) {
@@ -60,12 +82,10 @@ public class ActiveNodeManager {
 
         ActiveResourceNode newNode = new ActiveResourceNode(blockLocation, nodeTypeId);
         activeNodes.put(blockLocation, newNode);
+        resourceNodeRepository.saveOrUpdateNode(newNode); // PERSIST
 
-        // Set the block in the world
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            Block block = blockLocation.getBlock();
-            block.setType(nodeType.getDisplayMaterial());
-            // TODO: Set custom block data if needed (e.g. for custom textures via resource pack)
+            blockLocation.getBlock().setType(nodeType.getDisplayMaterial());
             logger.info("Placed new resource node '" + nodeTypeId + "' at " + blockLocationToString(blockLocation));
         });
     }
@@ -79,7 +99,6 @@ public class ActiveNodeManager {
         if (node == null || node.isDepleted()) {
             return;
         }
-
         Optional<ResourceNodeType> nodeTypeOpt = nodeRegistryService.getNodeType(node.getNodeTypeId());
         if (nodeTypeOpt.isEmpty()) {
             logger.severe("Cannot deplete node: Unknown NodeType ID '" + node.getNodeTypeId() + "' for node at " + blockLocationToString(node.getLocation()));
@@ -89,11 +108,10 @@ public class ActiveNodeManager {
 
         node.setDepleted(true);
         node.setRespawnAtMillis(System.currentTimeMillis() + (nodeType.getRespawnTimeSeconds() * 1000L));
+        resourceNodeRepository.saveOrUpdateNode(node); // PERSIST
 
-        // Change block in world to depleted state
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            Block block = node.getLocation().getBlock();
-            block.setType(depletedMaterial);
+            node.getLocation().getBlock().setType(depletedMaterial);
             logger.debug("Depleted node '" + node.getNodeTypeId() + "' at " + blockLocationToString(node.getLocation()) + ". Respawning in " + nodeType.getRespawnTimeSeconds() + "s.");
         });
     }
@@ -102,22 +120,19 @@ public class ActiveNodeManager {
         if (node == null || !node.isDepleted()) {
             return;
         }
-
         Optional<ResourceNodeType> nodeTypeOpt = nodeRegistryService.getNodeType(node.getNodeTypeId());
         if (nodeTypeOpt.isEmpty()) {
             logger.severe("Cannot respawn node: Unknown NodeType ID '" + node.getNodeTypeId() + "' for node at " + blockLocationToString(node.getLocation()));
-            // Potentially remove it from activeNodes if type is gone? Or leave it as depleted forever.
             return;
         }
         ResourceNodeType nodeType = nodeTypeOpt.get();
 
         node.setDepleted(false);
         node.setRespawnAtMillis(0);
+        resourceNodeRepository.saveOrUpdateNode(node); // PERSIST
 
-        // Change block back to display material
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            Block block = node.getLocation().getBlock();
-            block.setType(nodeType.getDisplayMaterial());
+            node.getLocation().getBlock().setType(nodeType.getDisplayMaterial());
             logger.debug("Respawned node '" + node.getNodeTypeId() + "' at " + blockLocationToString(node.getLocation()));
         });
     }
@@ -131,16 +146,11 @@ public class ActiveNodeManager {
         }
     }
 
-    /**
-     * Removes a node from tracking and attempts to set its block to air.
-     * Useful for admin commands or if a node type is removed.
-     * @param location The location of the node to remove.
-     * @return true if a node was found and removed, false otherwise.
-     */
     public boolean removeNode(Location location) {
         Location blockLocation = location.getBlock().getLocation();
         ActiveResourceNode node = activeNodes.remove(blockLocation);
         if (node != null) {
+            resourceNodeRepository.deleteNode(node); // PERSIST
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 blockLocation.getBlock().setType(Material.AIR);
                 logger.info("Removed resource node '" + node.getNodeTypeId() + "' from " + blockLocationToString(blockLocation));
@@ -160,9 +170,10 @@ public class ActiveNodeManager {
     }
 
     public void shutdown() {
-        // If this manager had its own scheduled tasks, cancel them here.
-        // For now, tickNodes is called by an external scheduler in MMOCraftPlugin.
-        logger.info("ActiveNodeManager shutting down. Persisting node states is not yet implemented.");
-        // Potentially save all node states to disk here if persistence is desired.
+        logger.info("ActiveNodeManager shutting down. Persisting " + activeNodes.size() + " node states...");
+        for (ActiveResourceNode node : activeNodes.values()) {
+            resourceNodeRepository.saveOrUpdateNode(node);
+        }
+        logger.info("All active resource node states have been persisted.");
     }
 }
