@@ -1,18 +1,40 @@
-# Gradle & Java
-.gradle/
+# Gradle
+.gradle
 build/
-out/
-!gradle/wrapper/gradle-wrapper.jar
-*.class
-*.jar
-*.log
-# IDEs
+!build/libs/
+
+# IDE files
 .idea/
 *.iml
-.vscode/
-# OS cruft
-.DS_Store
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+*.class
 
-# MMOCraft Server
-/server/
-*.pid
+# Logs and temp files
+logs/
+*.log
+*.tmp
+*.swp
+
+# Server-specific files
+server/
+!server/plugins/
+!server/plugins/.paper-remapped
+!server/plugins/bStats
+!server/plugins/spark
+!server/eula.txt
+!server/purpur.yml
+!server/spigot.yml
+!server/bukkit.yml
+!server/commands.yml
+!server/help.yml
+!server/server.properties
+server.pid
+
+# Other
+*~
+out/
+bin/
