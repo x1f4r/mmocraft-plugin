@@ -111,7 +111,8 @@ function start_server {
 
     cd "$SERVER_DIR" || exit
     print_info "Starting Minecraft server..."
-    nohup java $MEMORY_ARGS -jar "$JAR_NAME" --nogui > /dev/null 2>&1 &
+    # Redirect stdout and stderr to server.log to capture startup messages
+    nohup java $MEMORY_ARGS -jar "$JAR_NAME" --nogui > server.log 2>&1 &
     echo $! > "server.pid"
     cd ..
 
