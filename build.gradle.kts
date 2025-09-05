@@ -37,7 +37,9 @@ tasks.withType<JavaCompile> {
 // Configure shadowJar to include the SQLite JDBC driver
 tasks.shadowJar {
     archiveClassifier.set("") // Optional: removes the 'all' classifier from the uber-jar
-    relocate("org.sqlite", "com.x1f4r.mmocraft.lib.sqlite") // Relocate to avoid conflicts
+    mergeServiceFiles() // Required for shaded JDBC drivers to work correctly
+    // Do not relocate org.sqlite, as it breaks native library loading on some platforms (e.g., macOS)
+    // relocate("org.sqlite", "com.x1f4r.mmocraft.lib.sqlite")
 }
 
 // Configure JUnit Platform for tests

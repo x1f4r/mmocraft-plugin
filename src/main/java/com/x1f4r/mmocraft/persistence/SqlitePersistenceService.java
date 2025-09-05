@@ -38,9 +38,10 @@ public class SqlitePersistenceService implements PersistenceService {
         this.dbUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();
 
         try {
-            Class.forName("com.x1f4r.mmocraft.lib.sqlite.JDBC");
+            // We are no longer relocating the driver, so we use its original path.
+            Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException e) {
-            this.log.severe("SQLite JDBC driver not found after relocation. Shading might have failed.", e);
+            this.log.severe("SQLite JDBC driver not found. Ensure it's included in the final plugin JAR.", e);
             throw new RuntimeException("Failed to load SQLite JDBC driver", e);
         }
     }
