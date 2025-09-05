@@ -1,6 +1,6 @@
 package com.x1f4r.mmocraft.util;
 
-import com.x1f4r.mmocraft.config.ConfigService; // To potentially check for debug mode
+import com.x1f4r.mmocraft.config.ConfigService;
 import org.bukkit.plugin.Plugin;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -9,12 +9,12 @@ public class LoggingUtil {
 
     private final Logger logger;
     private final String prefix;
-    private final ConfigService configService; // Optional, for debug checking
+    private final ConfigService configService;
 
     public LoggingUtil(Plugin plugin, ConfigService configService) {
         this.logger = plugin.getLogger();
         this.prefix = "[" + plugin.getName() + "] ";
-        this.configService = configService; // May be null if not provided
+        this.configService = configService;
     }
 
     public LoggingUtil(Plugin plugin) {
@@ -29,6 +29,10 @@ public class LoggingUtil {
         logger.warning(prefix + message);
     }
 
+    public void warning(String message, Throwable throwable) {
+        logger.log(Level.WARNING, prefix + message, throwable);
+    }
+
     public void severe(String message) {
         logger.severe(prefix + message);
     }
@@ -38,7 +42,6 @@ public class LoggingUtil {
     }
 
     public void debug(String message) {
-        // For now, debug logs if configService is null or debug-logging is true
         boolean debugEnabled = (configService == null) || configService.getBoolean("core.debug-logging");
         if (debugEnabled) {
             logger.info(prefix + "[DEBUG] " + message);
@@ -46,7 +49,7 @@ public class LoggingUtil {
     }
 
     public void fine(String message) {
-        logger.fine(prefix + message); // For more detailed tracing if needed
+        logger.fine(prefix + message);
     }
 
     public void finer(String message) {
