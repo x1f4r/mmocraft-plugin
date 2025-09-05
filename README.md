@@ -46,6 +46,8 @@ MMOCraft is built on a collection of robust, interconnected systems.
 
 ## Getting Started
 
+Follow these steps to get the plugin running.
+
 1.  **Build the Plugin:**
     ```bash
     # Make sure the Gradle wrapper is executable
@@ -54,11 +56,36 @@ MMOCraft is built on a collection of robust, interconnected systems.
     # Build the shaded JAR
     ./gradlew build
     ```
-2.  **Install:**
-    *   Take the resulting JAR file from `build/libs/`. It will be named something like `MMOCraft-0.1.0-SNAPSHOT-all.jar`.
-    *   Drop this JAR into the `plugins` directory of a **Purpur 1.21.5** server.
-3.  **Run the Server:**
-    *   Start your server. The plugin will create its default configuration files in `/plugins/MMOCraft/`.
+    The final plugin JAR will be in the `build/libs/` directory.
+
+2.  **Set Up & Run the Server:**
+    The repository includes a convenient script to handle server setup and management.
+    ```bash
+    # Make the script executable (only needs to be done once)
+    chmod +x ./server.sh
+
+    # Start the server
+    ./server.sh start
+    ```
+    The first time you run this, the script will automatically:
+    *   Download the correct Purpur server JAR into a `server/` directory.
+    *   Accept the Minecraft EULA on your behalf.
+    *   Start the server.
+
+    The built plugin JAR from step 1 will need to be manually moved into the `server/plugins/` directory.
+
+## Server Management (`server.sh`)
+
+Use the `server.sh` script to manage your server lifecycle.
+
+| Command | Description |
+| --- | --- |
+| `./server.sh start` | Starts the server in the background. Performs initial setup if needed. |
+| `./server.sh stop` | Stops the running server. |
+| `./server.sh restart` | Restarts the server. |
+| `./server.sh status` | Checks if the server process is currently running. |
+| `./server.sh console` | Attaches to and tails the live server log (`logs/latest.log`). |
+| `./server.sh setup` | Manually runs the download and EULA acceptance process. |
 
 ## Configuration
 

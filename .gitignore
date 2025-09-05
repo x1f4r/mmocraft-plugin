@@ -12,3 +12,7 @@ out/
 .vscode/
 # OS cruft
 .DS_Store
+
+# MMOCraft Server
+/server/
+*.pid
