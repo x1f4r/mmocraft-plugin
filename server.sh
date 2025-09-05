@@ -24,16 +24,50 @@ function print_error {
 }
 
 function print_usage {
-    echo "Usage: $0 {start|stop|restart|status|console|setup}"
-    echo "  start   - Starts the server (will run setup if needed)."
+    echo "Usage: $0 {start|stop|restart|status|console|setup|build|deploy}"
+    echo "  start   - Builds, deploys, and starts the server."
     echo "  stop    - Stops the server."
-    echo "  restart - Restarts the server."
+    echo "  restart - Stops, rebuilds, deploys, and starts the server."
     echo "  status  - Checks if the server is running."
     echo "  console - Attaches to the server console log."
     echo "  setup   - Performs the initial server setup (download, eula)."
+    echo "  build   - Compiles the plugin."
+    echo "  deploy  - Copies the built plugin to the server directory."
 }
 
 # --- Core Functions ---
+
+function build_plugin {
+    print_info "Building the MMOCraft plugin..."
+    if ! ./gradlew clean build; then
+        print_error "Plugin build failed. Please check the Gradle output. Aborting."
+        exit 1
+    fi
+    print_info "Plugin built successfully."
+}
+
+function deploy_plugin {
+    print_info "Deploying plugin to server..."
+    # Find the plugin jar, ignoring sources and javadoc jars
+    local plugin_jar
+    plugin_jar=$(find build/libs -type f -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" | head -n 1)
+
+    if [ -z "$plugin_jar" ]; then
+        print_error "Could not find the plugin JAR file in build/libs/. Aborting."
+        exit 1
+    fi
+
+    local plugin_name
+    plugin_name=$(basename "$plugin_jar")
+    print_info "Found plugin: $plugin_name"
+
+    if ! cp "$plugin_jar" "${SERVER_DIR}/plugins/"; then
+        print_error "Failed to copy plugin to ${SERVER_DIR}/plugins/. Aborting."
+        exit 1
+    fi
+
+    print_info "Plugin successfully deployed to the server."
+}
 
 function setup_server {
     print_info "Starting server setup..."
@@ -66,6 +100,10 @@ function start_server {
         exit 1
     fi
 
+    # Build and deploy the plugin first
+    build_plugin
+    deploy_plugin
+
     if [ ! -f "$SERVER_JAR_PATH" ]; then
         print_info "Server JAR not found. Running setup first."
         setup_server
@@ -80,6 +118,7 @@ function start_server {
     sleep 5 # Give server time to start up a bit
     if is_running; then
         print_info "Server started successfully with PID $(cat $PID_FILE)."
+        print_info "To view the console, run: $0 console"
     else
         print_error "Server failed to start. Check logs in ${SERVER_DIR}/logs/"
     fi
@@ -166,6 +205,12 @@ case "$1" in
         ;;
     setup)
         setup_server
+        ;;
+    build)
+        build_plugin
+        ;;
+    deploy)
+        deploy_plugin
         ;;
     *)
         print_usage
