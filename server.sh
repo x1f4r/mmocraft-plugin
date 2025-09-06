@@ -2,17 +2,16 @@
 
 # --- Configuration ---
 MINECRAFT_VERSION="1.21.5"
-PURPUR_BUILD="2450" # The latest build for 1.21.5 as of writing
+PURPUR_BUILD="2450"
 SERVER_JAR_URL="https://api.purpurmc.org/v2/purpur/${MINECRAFT_VERSION}/${PURPUR_BUILD}/download"
 SERVER_DIR="server"
 JAR_NAME="purpur-${MINECRAFT_VERSION}-${PURPUR_BUILD}.jar"
 SERVER_JAR_PATH="${SERVER_DIR}/${JAR_NAME}"
 EULA_PATH="${SERVER_DIR}/eula.txt"
-PID_FILE="${SERVER_DIR}/server.pid"
-LOG_FILE="${SERVER_DIR}/logs/latest.log"
+SCREEN_NAME="mmocraft_server" # Name for the screen session
 
 # --- Java Settings ---
-MEMORY_ARGS="-Xms2G -Xmx2G" # 2GB initial and max heap size
+MEMORY_ARGS="-Xms2G -Xmx2G"
 
 # --- Helper Functions ---
 function print_info {
@@ -24,15 +23,16 @@ function print_error {
 }
 
 function print_usage {
-    echo "Usage: $0 {start|stop|restart|status|console|setup|build|deploy}"
-    echo "  start   - Builds, deploys, and starts the server."
-    echo "  stop    - Stops the server."
-    echo "  restart - Stops, rebuilds, deploys, and starts the server."
-    echo "  status  - Checks if the server is running."
-    echo "  console - Attaches to the server console log."
-    echo "  setup   - Performs the initial server setup (download, eula)."
-    echo "  build   - Compiles the plugin."
-    echo "  deploy  - Copies the built plugin to the server directory."
+    echo "Usage: $0 {start|stop|restart|status|console|command|setup|build|deploy}"
+    echo "  start     - Builds, deploys, and starts the server in a screen session."
+    echo "  stop      - Stops the server gracefully."
+    echo "  restart   - Stops, rebuilds, deploys, and starts the server."
+    echo "  status    - Checks if the server screen session is running."
+    echo "  console   - Attaches to the interactive server console."
+    echo "  command   - Sends a command to the server (e.g., '$0 command say Hello')."
+    echo "  setup     - Performs the initial server setup (download, eula)."
+    echo "  build     - Compiles the plugin."
+    echo "  deploy    - Copies the built plugin to the server directory."
 }
 
 # --- Core Functions ---
@@ -48,7 +48,6 @@ function build_plugin {
 
 function deploy_plugin {
     print_info "Deploying plugin to server..."
-    # Find the plugin jar, ignoring sources and javadoc jars
     local plugin_jar
     plugin_jar=$(find build/libs -type f -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" | head -n 1)
 
@@ -76,7 +75,7 @@ function setup_server {
     if [ ! -f "$SERVER_JAR_PATH" ]; then
         print_info "Purpur JAR not found. Downloading..."
         if ! curl -L -o "$SERVER_JAR_PATH" "$SERVER_JAR_URL"; then
-            print_error "Failed to download Purpur JAR. Please check the URL or your internet connection."
+            print_error "Failed to download Purpur JAR."
             exit 1
         fi
         print_info "Download complete."
@@ -94,13 +93,25 @@ function setup_server {
     print_info "Setup complete."
 }
 
+function is_running {
+    if screen -list | grep -q "\.${SCREEN_NAME}"; then
+        return 0 # Screen session exists
+    else
+        return 1 # No such screen session
+    fi
+}
+
 function start_server {
-    if is_running; then
-        print_error "Server is already running."
+    if ! command -v screen &> /dev/null; then
+        print_error "'screen' is not installed. Please install it to use the interactive console."
         exit 1
     fi
 
-    # Build and deploy the plugin first
+    if is_running; then
+        print_error "Server is already running in screen session '$SCREEN_NAME'."
+        exit 1
+    fi
+
     build_plugin
     deploy_plugin
 
@@ -109,19 +120,19 @@ function start_server {
         setup_server
     fi
 
+    print_info "Starting Minecraft server in screen session '$SCREEN_NAME'..."
     cd "$SERVER_DIR" || exit
-    print_info "Starting Minecraft server..."
-    # Redirect stdout and stderr to server.log to capture startup messages
-    nohup java $MEMORY_ARGS -jar "$JAR_NAME" --nogui > server.log 2>&1 &
-    echo $! > "server.pid"
+    # Start server in a detached screen session
+    screen -S "$SCREEN_NAME" -d -m java $MEMORY_ARGS -jar "$JAR_NAME" --nogui
     cd ..
 
-    sleep 5 # Give server time to start up a bit
+    sleep 3
     if is_running; then
-        print_info "Server started successfully with PID $(cat $PID_FILE)."
-        print_info "To view the console, run: $0 console"
+        print_info "Server started successfully."
+        print_info "To connect to the console, run: $0 console"
+        print_info "To send a command, run: $0 command <your-command>"
     else
-        print_error "Server failed to start. Check logs in ${SERVER_DIR}/logs/"
+        print_error "Server failed to start. Check for crash logs in '${SERVER_DIR}/crash-reports/' or view the screen buffer with 'screen -r ${SCREEN_NAME}'."
     fi
 }
 
@@ -131,58 +142,55 @@ function stop_server {
         exit 1
     fi
 
-    local pid
-    pid=$(cat "$PID_FILE")
-    print_info "Stopping server with PID $pid..."
-    kill "$pid"
+    print_info "Sending 'stop' command to the server..."
+    screen -S "$SCREEN_NAME" -p 0 -X stuff "stop\n"
 
-    # Wait for server to stop
     local count=0
+    print_info "Waiting for server to shut down..."
     while is_running; do
         sleep 1
         count=$((count + 1))
-        if [ $count -gt 15 ]; then
-            print_error "Server did not stop gracefully after 15 seconds. Forcing shutdown..."
-            kill -9 "$pid"
-            break
+        if [ $count -gt 30 ]; then
+            print_error "Server did not stop after 30 seconds. You may need to kill the screen session manually: 'screen -X -S ${SCREEN_NAME} quit'"
+            exit 1
         fi
     done
-
-    rm -f "$PID_FILE"
     print_info "Server stopped."
-}
-
-function is_running {
-    if [ -f "$PID_FILE" ]; then
-        local pid
-        pid=$(cat "$PID_FILE")
-        if ps -p "$pid" > /dev/null; then
-            return 0 # Process is running
-        else
-            # PID file exists but process is not running, cleanup
-            rm -f "$PID_FILE"
-            return 1
-        fi
-    fi
-    return 1 # Not running
 }
 
 function server_status {
     if is_running; then
-        print_info "Server is RUNNING with PID $(cat $PID_FILE)."
+        print_info "Server is RUNNING in screen session '$SCREEN_NAME'."
     else
         print_info "Server is STOPPED."
     fi
 }
 
-function view_console {
-    if [ -f "$LOG_FILE" ]; then
-        tail -f "$LOG_FILE"
-    else
-        print_error "Log file not found. Is the server running for the first time?"
+function attach_console {
+    if ! is_running; then
+        print_error "Server is not running. Cannot attach to console."
+        exit 1
     fi
+    print_info "Attaching to server console. Press 'Ctrl+A' then 'D' to detach."
+    screen -r "$SCREEN_NAME"
 }
 
+function send_command {
+    if ! is_running; then
+        print_error "Server is not running. Cannot send command."
+        exit 1
+    fi
+    if [ -z "$1" ]; then
+        print_error "No command provided."
+        print_usage
+        exit 1
+    fi
+
+    # The rest of the arguments are treated as the command
+    local cmd="$*"
+    print_info "Sending command: '$cmd'"
+    screen -S "$SCREEN_NAME" -p 0 -X stuff "$cmd\n"
+}
 
 # --- Main Logic ---
 case "$1" in
@@ -202,7 +210,11 @@ case "$1" in
         server_status
         ;;
     console)
-        view_console
+        attach_console
+        ;;
+    command)
+        shift # Remove 'command' from the arguments
+        send_command "$@"
         ;;
     setup)
         setup_server

@@ -19,7 +19,7 @@ class LoggingUtilTest {
     @Mock
     private Plugin mockPlugin;
     @Mock
-    private Logger mockBukkitLogger; // This is what plugin.getLogger() returns
+    private Logger mockBukkitLogger;
     @Mock
     private ConfigService mockConfigService;
 
@@ -50,6 +50,14 @@ class LoggingUtilTest {
         String message = "This is a warning message.";
         loggingUtil.warning(message);
         verify(mockBukkitLogger).warning(expectedPrefix + message);
+    }
+
+    @Test
+    void warning_withThrowable_shouldLogWithWarningLevelAndThrowable() {
+        String message = "This is a warning message with throwable.";
+        Throwable throwable = new RuntimeException("Test Exception");
+        loggingUtil.warning(message, throwable);
+        verify(mockBukkitLogger).log(Level.WARNING, expectedPrefix + message, throwable);
     }
 
     @Test
@@ -88,7 +96,7 @@ class LoggingUtilTest {
         when(mockConfigService.getBoolean("core.debug-logging")).thenReturn(false);
         String message = "Debug message (disabled).";
         loggingUtilWithConfig.debug(message);
-        verify(mockBukkitLogger, never()).info(expectedPrefix + "[DEBUG] " + message);
+        verify(mockBukkitLogger, never()).info(anyString());
     }
 
     @Test

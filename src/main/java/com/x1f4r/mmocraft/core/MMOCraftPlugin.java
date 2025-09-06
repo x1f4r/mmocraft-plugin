@@ -43,10 +43,10 @@ import com.x1f4r.mmocraft.skill.service.SkillRegistryService;
 import com.x1f4r.mmocraft.statuseffect.manager.BasicStatusEffectManager;
 import com.x1f4r.mmocraft.statuseffect.manager.StatusEffectManager;
 import com.x1f4r.mmocraft.util.LoggingUtil;
+import com.x1f4r.mmocraft.world.resourcegathering.persistence.ResourceNodeRepository;
 import com.x1f4r.mmocraft.world.spawning.service.BasicCustomSpawningService;
 import com.x1f4r.mmocraft.world.spawning.service.CustomSpawningService;
 import com.x1f4r.mmocraft.world.zone.listeners.PlayerZoneTrackerListener;
-import com.x1f4r.mmocraft.world.zone.model.Zone;
 import com.x1f4r.mmocraft.world.zone.service.BasicZoneManager;
 import com.x1f4r.mmocraft.world.zone.service.ZoneManager;
 import com.x1f4r.mmocraft.world.resourcegathering.listeners.ResourceNodeInteractionListener;
@@ -59,7 +59,6 @@ import com.x1f4r.mmocraft.world.spawning.conditions.SpawnCondition;
 import com.x1f4r.mmocraft.world.spawning.conditions.TimeCondition;
 import com.x1f4r.mmocraft.world.spawning.model.CustomSpawnRule;
 import com.x1f4r.mmocraft.world.spawning.model.MobSpawnDefinition;
-
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -96,12 +95,13 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private CraftingUIManager craftingUIManager;
     private CustomSpawningService customSpawningService;
     private ZoneManager zoneManager;
-    private ResourceNodeRegistryService resourceNodeRegistryService; // Resource Gathering
-    private ActiveNodeManager activeNodeManager;                     // Resource Gathering
+    private ResourceNodeRegistryService resourceNodeRegistryService;
+    private ResourceNodeRepository resourceNodeRepository;
+    private ActiveNodeManager activeNodeManager;
     private LoggingUtil loggingUtil;
     private BukkitTask statusEffectTickTask;
     private BukkitTask customSpawningTask;
-    private BukkitTask resourceNodeTickTask;                         // Resource Gathering
+    private BukkitTask resourceNodeTickTask;
 
     @Override
     public void onEnable() {
@@ -130,7 +130,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
     public void onDisable() {
         loggingUtil.info("MMOCraft shutting down...");
 
-        if (resourceNodeTickTask != null && !resourceNodeTickTask.isCancelled()) { // Resource Gathering
+        if (resourceNodeTickTask != null && !resourceNodeTickTask.isCancelled()) {
             resourceNodeTickTask.cancel();
             loggingUtil.info("ActiveNodeManager task scheduler cancelled.");
         }
@@ -152,7 +152,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
         if (customSpawningService instanceof BasicCustomSpawningService) {
             ((BasicCustomSpawningService) customSpawningService).shutdown();
         }
-        if (activeNodeManager != null) { // Resource Gathering
+        if (activeNodeManager != null) {
             activeNodeManager.shutdown();
         }
         if (persistenceService != null) {
@@ -167,20 +167,15 @@ public final class MMOCraftPlugin extends JavaPlugin {
         loggingUtil.info("MMOCraft has been disabled.");
     }
 
-    // --- Plugin Setup Methods ---
-
     private boolean initLoggingAndConfig() {
         try {
-            // Use a preliminary logger for the very first steps
             LoggingUtil preliminaryLogger = new LoggingUtil(this);
             configService = new BasicConfigService(this, preliminaryLogger);
-            // Once config is loaded, create the final logger that respects the config's debug level
             loggingUtil = new LoggingUtil(this, configService);
             preliminaryLogger.info("Preliminary logger transitioning to final logger.");
             loggingUtil.info("Final LoggingUtil initialized.");
             return true;
         } catch (Exception e) {
-            // If this fails, we don't have our custom logger, so we use the plugin's default logger
             getLogger().severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             getLogger().severe("FATAL: Could not initialize logging and configuration services.");
             getLogger().severe("The plugin cannot continue to load.");
@@ -195,11 +190,9 @@ public final class MMOCraftPlugin extends JavaPlugin {
             eventBusService = new BasicEventBusService(loggingUtil);
             commandRegistryService = new BasicCommandRegistryService(this);
 
-            // Initialize persistence layer
             persistenceService = new SqlitePersistenceService(this);
             persistenceService.initDatabase();
 
-            // Initialize player data service, which depends on persistence
             playerDataService = new BasicPlayerDataService(this, persistenceService, loggingUtil, eventBusService);
             playerDataService.initDatabaseSchema();
 
@@ -226,8 +219,12 @@ public final class MMOCraftPlugin extends JavaPlugin {
         craftingUIManager = new CraftingUIManager(this, recipeRegistryService, playerDataService, customItemRegistry, loggingUtil);
         customSpawningService = new BasicCustomSpawningService(this, loggingUtil, mobStatProvider, lootService, customItemRegistry);
         zoneManager = new BasicZoneManager(this, loggingUtil, eventBusService);
+
         resourceNodeRegistryService = new BasicResourceNodeRegistryService(loggingUtil);
-        activeNodeManager = new ActiveNodeManager(this, loggingUtil, resourceNodeRegistryService, lootService, customItemRegistry);
+        resourceNodeRepository = new ResourceNodeRepository(persistenceService, loggingUtil);
+        resourceNodeRepository.initDatabaseSchema();
+        activeNodeManager = new ActiveNodeManager(this, loggingUtil, resourceNodeRegistryService, resourceNodeRepository, lootService, customItemRegistry);
+
         loggingUtil.info("All gameplay services initialized.");
     }
 
@@ -239,12 +236,10 @@ public final class MMOCraftPlugin extends JavaPlugin {
         loggingUtil.info("Skills registered.");
 
         registerDefaultLootTables();
-        loggingUtil.info("Default loot tables registered.");
 
-        // TODO: Register custom spawn rules here for CustomSpawningService
         registerCustomSpawns();
 
-        zoneManager.loadZones(); // Load zones from zones.yml
+        zoneManager.loadZones();
 
         registerResourceNodeTypes();
         placeInitialResourceNodes();
@@ -258,7 +253,6 @@ public final class MMOCraftPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlayerEquipmentListener(this, playerEquipmentManager, loggingUtil), this);
         getServer().getPluginManager().registerEvents(new ResourceNodeInteractionListener(this, activeNodeManager, resourceNodeRegistryService, lootService, customItemRegistry, playerDataService, loggingUtil), this);
         getServer().getPluginManager().registerEvents(new MobDeathLootListener(lootService, customItemRegistry, this, loggingUtil), this);
-        // CraftingUIManager registers its own listeners.
         loggingUtil.info("Event listeners registered.");
     }
 
@@ -271,34 +265,24 @@ public final class MMOCraftPlugin extends JavaPlugin {
     }
 
     private void startSchedulers() {
-        // Status Effect Ticker
-        long statusEffectTickInterval = 20L; // 1 second
+        long statusEffectTickInterval = 20L;
         statusEffectTickTask = getServer().getScheduler().runTaskTimer(this, () -> {
-            if (statusEffectManager != null) {
-                statusEffectManager.tickAllActiveEffects();
-            }
+            if (statusEffectManager != null) statusEffectManager.tickAllActiveEffects();
         }, statusEffectTickInterval, statusEffectTickInterval);
         loggingUtil.info("StatusEffect tick scheduler started.");
 
-        // Custom Mob Spawning Ticker
-        long spawningInterval = 200L; // 10 seconds
+        long spawningInterval = 200L;
         customSpawningTask = getServer().getScheduler().runTaskTimer(this, () -> {
-            if (customSpawningService != null) {
-                customSpawningService.attemptSpawns();
-            }
+            if (customSpawningService != null) customSpawningService.attemptSpawns();
         }, spawningInterval, spawningInterval);
         loggingUtil.info("CustomSpawningService task scheduler started.");
 
-        // Resource Node Respawn Ticker
-        long resourceNodeTickInterval = 100L; // 5 seconds
+        long resourceNodeTickInterval = 100L;
         resourceNodeTickTask = getServer().getScheduler().runTaskTimer(this, () -> {
-            if (activeNodeManager != null) {
-                activeNodeManager.tickNodes();
-            }
+            if (activeNodeManager != null) activeNodeManager.tickNodes();
         }, resourceNodeTickInterval, resourceNodeTickInterval);
         loggingUtil.info("ActiveNodeManager task scheduler started.");
 
-        // Register a handler for the custom reload event
         if (eventBusService != null) {
             eventBusService.register(PluginReloadedEvent.class, event -> {
                 loggingUtil.info("PluginReloadedEvent handled: Configuration has been reloaded.");
@@ -308,7 +292,6 @@ public final class MMOCraftPlugin extends JavaPlugin {
         }
     }
 
-    // --- Service Getters ---
     public ConfigService getConfigService() { return configService; }
     public EventBusService getEventBusService() { return eventBusService; }
     public PersistenceService getPersistenceService() { return persistenceService; }
@@ -325,59 +308,47 @@ public final class MMOCraftPlugin extends JavaPlugin {
     public CraftingUIManager getCraftingUIManager() { return craftingUIManager; }
     public CustomSpawningService getCustomSpawningService() { return customSpawningService; }
     public ZoneManager getZoneManager() { return zoneManager; }
-    public ResourceNodeRegistryService getResourceNodeRegistryService() { return resourceNodeRegistryService; } // Resource Gathering
-    public ActiveNodeManager getActiveNodeManager() { return activeNodeManager; }                     // Resource Gathering
+    public ResourceNodeRegistryService getResourceNodeRegistryService() { return resourceNodeRegistryService; }
+    public ActiveNodeManager getActiveNodeManager() { return activeNodeManager; }
     public LoggingUtil getLoggingUtil() { return loggingUtil; }
 
-    // --- Plugin Setup Methods ---
-    private void registerResourceNodeTypes() { // Resource Gathering
+    private void registerResourceNodeTypes() {
         if (resourceNodeRegistryService == null || lootService == null) {
             loggingUtil.severe("ResourceNodeRegistryService or LootService not initialized. Cannot register node types.");
             return;
         }
 
-        // Define and register a loot table for Stone nodes
         if (lootService.getLootTableById("stone_node_loot").isEmpty()) {
-            LootTable stoneLoot = new LootTable("stone_node_loot", List.of(
-                new LootTableEntry(LootType.VANILLA, "COBBLESTONE", 1.0, 1, 1)
-            ));
+            LootTable stoneLoot = new LootTable("stone_node_loot", List.of(new LootTableEntry(LootType.VANILLA, "COBBLESTONE", 1.0, 1, 1)));
             lootService.registerLootTableById(stoneLoot);
             loggingUtil.info("Registered 'stone_node_loot' table.");
         }
 
-        // Define and register a loot table for Iron Ore nodes
         if (lootService.getLootTableById("iron_ore_node_loot").isEmpty()) {
-            LootTable ironLoot = new LootTable("iron_ore_node_loot", List.of(
-                new LootTableEntry(LootType.VANILLA, "RAW_IRON", 1.0, 1, 1)
-            ));
+            LootTable ironLoot = new LootTable("iron_ore_node_loot", List.of(new LootTableEntry(LootType.VANILLA, "RAW_IRON", 1.0, 1, 1)));
             lootService.registerLootTableById(ironLoot);
             loggingUtil.info("Registered 'iron_ore_node_loot' table.");
         }
 
-        // Define and register the Stone Resource Node Type
-        ResourceNodeType stoneNode = new ResourceNodeType(
-                "stone_node", Material.STONE, 5.0,
-                Set.of(Material.WOODEN_PICKAXE, Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE),
-                "stone_node_loot", 60, "&7Stone Deposit"
-        );
+        ResourceNodeType stoneNode = new ResourceNodeType("stone_node", Material.STONE, 5.0, Set.of(Material.WOODEN_PICKAXE, Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE), "stone_node_loot", 60, "&7Stone Deposit");
         resourceNodeRegistryService.registerNodeType(stoneNode);
 
-        // Define and register the Iron Ore Resource Node Type
-        ResourceNodeType ironOreNode = new ResourceNodeType(
-                "iron_ore_node", Material.IRON_ORE, 10.0,
-                Set.of(Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE),
-                "iron_ore_node_loot", 180, "&fIron Vein"
-        );
+        ResourceNodeType ironOreNode = new ResourceNodeType("iron_ore_node", Material.IRON_ORE, 10.0, Set.of(Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE), "iron_ore_node_loot", 180, "&fIron Vein");
         resourceNodeRegistryService.registerNodeType(ironOreNode);
 
         loggingUtil.info("Registered default resource node types.");
     }
 
-    private void placeInitialResourceNodes() { // Resource Gathering
+    private void placeInitialResourceNodes() {
         if (activeNodeManager == null) {
             loggingUtil.severe("ActiveNodeManager not initialized. Cannot place initial resource nodes.");
             return;
         }
+        if (!activeNodeManager.getAllActiveNodesView().isEmpty()) {
+            loggingUtil.info("Skipping initial resource node placement as nodes were loaded from the database.");
+            return;
+        }
+
         World defaultWorld = Bukkit.getWorld("world");
         if (defaultWorld == null && !Bukkit.getWorlds().isEmpty()) {
             defaultWorld = Bukkit.getWorlds().get(0);
@@ -387,7 +358,6 @@ public final class MMOCraftPlugin extends JavaPlugin {
             return;
         }
 
-        // Example locations - ensure these are suitable for your test world
         activeNodeManager.placeNewNode(new Location(defaultWorld, 10, 60, 10), "stone_node");
         activeNodeManager.placeNewNode(new Location(defaultWorld, 12, 60, 10), "stone_node");
         activeNodeManager.placeNewNode(new Location(defaultWorld, 10, 60, 12), "iron_ore_node");
@@ -417,9 +387,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
             loggingUtil.severe("LootService or CustomItemRegistry not initialized. Cannot register default loot tables.");
             return;
         }
-        LootTable zombieLootTable = new LootTable("zombie_common_drops", List.of(
-            new LootTableEntry("simple_sword", 0.05, 1, 1)
-        ));
+        LootTable zombieLootTable = new LootTable("zombie_common_drops", List.of(new LootTableEntry("simple_sword", 0.05, 1, 1)));
         lootService.registerLootTable(EntityType.ZOMBIE, zombieLootTable);
         loggingUtil.info("Default loot tables registered.");
     }
@@ -430,36 +398,9 @@ public final class MMOCraftPlugin extends JavaPlugin {
             return;
         }
 
-        // 1. Define the mob's properties
-        MobSpawnDefinition skeletalWarriorDef = new MobSpawnDefinition(
-                "skeletal_warrior",
-                EntityType.SKELETON,
-                ChatColor.RED + "Skeletal Warrior",
-                "skeletal_warrior_stats", // A key for MobStatProvider (can be custom)
-                "warrior_common_loot",    // A key for LootService (can be custom)
-                Map.of(EquipmentSlot.HAND, new ItemStack(Material.IRON_SWORD))
-        );
-
-        // 2. Define the conditions for the spawn rule
-        List<SpawnCondition> conditions = List.of(
-                new BiomeCondition(Set.of(Biome.PLAINS, Biome.MEADOW, Biome.SAVANNA)),
-                new TimeCondition(13000, 23000) // Night time
-        );
-
-        // 3. Create the spawn rule
-        CustomSpawnRule warriorRule = new CustomSpawnRule(
-                "plains_skeletal_warriors_night",
-                skeletalWarriorDef,
-                conditions,
-                0.1,  // 10% chance per attempt if conditions met
-                60,   // minSpawnHeight
-                200,  // maxSpawnHeight
-                5,    // maxNearbyEntities of same type
-                16.0, // radius to check for nearby entities
-                200   // 10-second global cooldown for this rule
-        );
-
-        // 4. Register the rule with the service
+        MobSpawnDefinition skeletalWarriorDef = new MobSpawnDefinition("skeletal_warrior", EntityType.SKELETON, ChatColor.RED + "Skeletal Warrior", "skeletal_warrior_stats", "warrior_common_loot", Map.of(EquipmentSlot.HAND, new ItemStack(Material.IRON_SWORD)));
+        List<SpawnCondition> conditions = List.of(new BiomeCondition(Set.of(Biome.PLAINS, Biome.MEADOW, Biome.SAVANNA)), new TimeCondition(13000, 23000));
+        CustomSpawnRule warriorRule = new CustomSpawnRule("plains_skeletal_warriors_night", skeletalWarriorDef, conditions, 0.1, 60, 200, 5, 16.0, 200);
         customSpawningService.registerRule(warriorRule);
     }
 
