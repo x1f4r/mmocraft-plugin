@@ -13,6 +13,11 @@ SCREEN_NAME="mmocraft_server" # Name for the screen session
 # --- Java Settings ---
 MEMORY_ARGS="-Xms2G -Xmx2G"
 
+# --- EULA Settings ---
+# Set to "true" to automatically accept the Minecraft EULA.
+# By doing so, you are indicating your agreement to the EULA (https://aka.ms/MinecraftEULA).
+AUTO_ACCEPT_EULA="false"
+
 # --- Helper Functions ---
 function print_info {
     echo "[INFO] $1"
@@ -83,12 +88,44 @@ function setup_server {
         print_info "Purpur JAR already exists."
     fi
 
-    if [ ! -f "$EULA_PATH" ]; then
-        print_info "EULA not accepted. Creating eula.txt..."
-        echo "eula=true" > "$EULA_PATH"
-        print_info "EULA has been accepted."
+    # Check if EULA needs to be handled
+    if [ ! -f "$EULA_PATH" ] || ! grep -q "eula=true" "$EULA_PATH"; then
+        # Run server once to generate files if eula.txt doesn't exist
+        if [ ! -f "$EULA_PATH" ]; then
+            print_info "First-time setup: Generating server files..."
+            (cd "$SERVER_DIR" && java -jar "$JAR_NAME" --initSettings)
+            print_info "Server files generated."
+        fi
+
+        if [ "$AUTO_ACCEPT_EULA" = "true" ]; then
+            print_info "Automatically accepting EULA..."
+            echo "eula=true" > "$EULA_PATH"
+            print_info "EULA has been accepted."
+        else
+            print_info "You need to agree to the Minecraft EULA."
+            print_info "Please read the EULA at: https://aka.ms/MinecraftEULA"
+            # Show the official text from the generated eula.txt
+            if [ -f "$EULA_PATH" ]; then
+                echo "---"
+                # The eula.txt file has comments we can show the user
+                grep '#' "$EULA_PATH"
+                echo "---"
+            fi
+
+            read -p "Do you agree to the EULA? (y/n) " -n 1 -r
+            echo # Move to a new line
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                print_info "Accepting EULA..."
+                # Use sed to change eula=false to eula=true
+                sed -i 's/eula=false/eula=true/' "$EULA_PATH"
+                print_info "EULA has been accepted."
+            else
+                print_error "You must agree to the EULA to run the server. Aborting."
+                exit 1
+            fi
+        fi
     else
-        print_info "eula.txt already exists."
+        print_info "EULA already accepted."
     fi
     print_info "Setup complete."
 }
