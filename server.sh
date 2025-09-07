@@ -123,7 +123,7 @@ function start_server {
     print_info "Starting Minecraft server in screen session '$SCREEN_NAME'..."
     cd "$SERVER_DIR" || exit
     # Start server in a detached screen session
-    screen -S "$SCREEN_NAME" -d -m java $MEMORY_ARGS -jar "$JAR_NAME" --nogui
+    screen -L -Logfile "screen.log" -S "$SCREEN_NAME" -d -m java $MEMORY_ARGS -jar "$JAR_NAME" --nogui
     cd ..
 
     sleep 3
@@ -203,6 +203,8 @@ case "$1" in
     restart)
         if is_running; then
             stop_server
+        print_info "Waiting for 3 seconds before restarting..."
+        sleep 3
         fi
         start_server
         ;;
