@@ -39,6 +39,75 @@ function print_usage {
     echo "  deploy    - Copies the built plugin to the server directory."
 }
 
+function get_server_port {
+    local properties_file="${SERVER_DIR}/server.properties"
+    if [ -f "$properties_file" ]; then
+        # Use grep and cut to extract the port number
+        local port
+        port=$(grep -E '^server-port=' "$properties_file" | cut -d'=' -f2)
+        # Check if port is a number, otherwise return default
+        if [[ "$port" =~ ^[0-9]+$ ]]; then
+            echo "$port"
+        else
+            echo "25565"
+        fi
+    else
+        # Fallback to default if server.properties doesn't exist
+        echo "25565"
+    fi
+}
+
+function cleanup_lingering_processes {
+    print_info "Checking for lingering server processes..."
+    # Check if lsof command exists, as it's the most reliable way to find a process by port
+    if ! command -v lsof &> /dev/null; then
+        print_info "'lsof' is not available. Skipping check for lingering processes by port."
+        # As a fallback, we can still try to kill any stray screen sessions.
+        if is_running; then
+            print_info "Terminating stray screen session '${SCREEN_NAME}'..."
+            screen -X -S "${SCREEN_NAME}" quit
+        fi
+        return
+    fi
+
+    local server_port
+    server_port=$(get_server_port)
+    # The -t flag gives just the PID, making it easy to script with.
+    # The -i :<port> flag finds processes using that TCP/UDP port.
+    local pid
+    pid=$(lsof -t -i :"$server_port")
+
+    if [ -n "$pid" ]; then
+        print_info "Found lingering process on port $server_port with PID $pid. Terminating..."
+        # Try to terminate gracefully first with SIGTERM
+        if kill "$pid"; then
+            local count=0
+            # Wait up to 10 seconds for the process to die
+            while kill -0 "$pid" 2>/dev/null; do
+                sleep 1
+                count=$((count + 1))
+                if [ $count -gt 10 ]; then
+                    print_error "Process $pid did not terminate after 10 seconds. Forcing shutdown (SIGKILL)..."
+                    kill -9 "$pid"
+                    sleep 2 # Give OS time to reap the process
+                    break
+                fi
+            done
+            print_info "Process terminated."
+        else
+            print_error "Failed to send termination signal to process $pid. It may already be gone."
+        fi
+    else
+        print_info "No lingering process found on port $server_port."
+    fi
+
+    # Also make sure the screen session is gone, in case it's alive but the process isn't listening.
+    if is_running; then
+        print_info "Terminating stray screen session '${SCREEN_NAME}'..."
+        screen -X -S "${SCREEN_NAME}" quit
+    fi
+}
+
 # --- Core Functions ---
 
 function build_plugin {
@@ -174,25 +243,30 @@ function start_server {
 }
 
 function stop_server {
-    if ! is_running; then
-        print_error "Server is not running."
-        exit 1
+    print_info "Initiating server shutdown sequence..."
+    if is_running; then
+        print_info "Attempting graceful shutdown via screen session..."
+        screen -S "$SCREEN_NAME" -p 0 -X stuff "stop\n"
+
+        local count=0
+        print_info "Waiting up to 30 seconds for server to stop..."
+        while is_running; do
+            sleep 1
+            count=$((count + 1))
+            if [ $count -gt 30 ]; then
+                print_error "Server did not stop gracefully after 30 seconds. Proceeding to force cleanup."
+                break # Exit loop and proceed to cleanup
+            fi
+        done
+        print_info "Graceful shutdown complete or timed out."
+    else
+        print_info "No running screen session found."
     fi
 
-    print_info "Sending 'stop' command to the server..."
-    screen -S "$SCREEN_NAME" -p 0 -X stuff "stop\n"
+    # Forcefully clean up any processes that might be left over.
+    cleanup_lingering_processes
 
-    local count=0
-    print_info "Waiting for server to shut down..."
-    while is_running; do
-        sleep 1
-        count=$((count + 1))
-        if [ $count -gt 30 ]; then
-            print_error "Server did not stop after 30 seconds. You may need to kill the screen session manually: 'screen -X -S ${SCREEN_NAME} quit'"
-            exit 1
-        fi
-    done
-    print_info "Server stopped."
+    print_info "Server stop sequence complete."
 }
 
 function server_status {
@@ -221,11 +295,10 @@ case "$1" in
         stop_server
         ;;
     restart)
-        if is_running; then
-            stop_server
-        print_info "Waiting for 3 seconds before restarting..."
+        print_info "Executing server restart..."
+        stop_server
+        print_info "Waiting a few seconds before starting again..."
         sleep 3
-        fi
         start_server
         ;;
     status)
