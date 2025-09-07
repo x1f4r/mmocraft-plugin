@@ -28,13 +28,12 @@ function print_error {
 }
 
 function print_usage {
-    echo "Usage: $0 {start|stop|restart|status|console|command|setup|build|deploy}"
+    echo "Usage: $0 {start|stop|restart|status|console|setup|build|deploy}"
     echo "  start     - Builds, deploys, and starts the server in a screen session."
     echo "  stop      - Stops the server gracefully."
     echo "  restart   - Stops, rebuilds, deploys, and starts the server."
     echo "  status    - Checks if the server screen session is running."
     echo "  console   - Attaches to the interactive server console."
-    echo "  command   - Sends a command to the server (e.g., '$0 command say Hello')."
     echo "  setup     - Performs the initial server setup (download, eula)."
     echo "  build     - Compiles the plugin."
     echo "  deploy    - Copies the built plugin to the server directory."
@@ -134,11 +133,9 @@ function setup_server {
 }
 
 function is_running {
-    if screen -list | grep -q "\.${SCREEN_NAME}"; then
-        return 0 # Screen session exists
-    else
-        return 1 # No such screen session
-    fi
+    # This is a more reliable way to check if a screen session exists.
+    # It queries the session directly rather than parsing the output of 'screen -list'.
+    screen -S "$SCREEN_NAME" -Q select . &>/dev/null
 }
 
 function start_server {
@@ -171,7 +168,6 @@ function start_server {
     if is_running; then
         print_info "Server started successfully."
         print_info "To connect to the console, run: $0 console"
-        print_info "To send a command, run: $0 command <your-command>"
     else
         print_error "Server failed to start. Check for crash logs in '${SERVER_DIR}/crash-reports/' or the screen log (e.g., '${SERVER_DIR}/screen.0'). You can also view the buffer with 'screen -r ${SCREEN_NAME}'."
     fi
@@ -216,23 +212,6 @@ function attach_console {
     screen -r "$SCREEN_NAME"
 }
 
-function send_command {
-    if ! is_running; then
-        print_error "Server is not running. Cannot send command."
-        exit 1
-    fi
-    if [ -z "$1" ]; then
-        print_error "No command provided."
-        print_usage
-        exit 1
-    fi
-
-    # The rest of the arguments are treated as the command
-    local cmd="$*"
-    print_info "Sending command: '$cmd'"
-    screen -S "$SCREEN_NAME" -p 0 -X stuff "$cmd\n"
-}
-
 # --- Main Logic ---
 case "$1" in
     start)
@@ -254,10 +233,6 @@ case "$1" in
         ;;
     console)
         attach_console
-        ;;
-    command)
-        shift # Remove 'command' from the arguments
-        send_command "$@"
         ;;
     setup)
         setup_server
