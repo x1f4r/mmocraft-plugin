@@ -116,8 +116,11 @@ function setup_server {
             echo # Move to a new line
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 print_info "Accepting EULA..."
-                # Use sed to change eula=false to eula=true
-                sed -i 's/eula=false/eula=true/' "$EULA_PATH"
+                # Use sed to change eula=false/eula=true (portable syntax for Linux and macOS)
+                if ! sed -i '' 's/eula=false/eula=true/' "$EULA_PATH"; then
+                    print_error "Failed to update eula.txt. Please edit it manually. Aborting."
+                    exit 1
+                fi
                 print_info "EULA has been accepted."
             else
                 print_error "You must agree to the EULA to run the server. Aborting."
@@ -160,7 +163,8 @@ function start_server {
     print_info "Starting Minecraft server in screen session '$SCREEN_NAME'..."
     cd "$SERVER_DIR" || exit
     # Start server in a detached screen session
-    screen -L -Logfile "screen.log" -S "$SCREEN_NAME" -d -m java $MEMORY_ARGS -jar "$JAR_NAME" --nogui
+    # The -L flag enables logging to a file, typically named "screen.0", "screen.1", etc.
+    screen -L -S "$SCREEN_NAME" -d -m java $MEMORY_ARGS -jar "$JAR_NAME" --nogui
     cd ..
 
     sleep 3
@@ -169,7 +173,7 @@ function start_server {
         print_info "To connect to the console, run: $0 console"
         print_info "To send a command, run: $0 command <your-command>"
     else
-        print_error "Server failed to start. Check for crash logs in '${SERVER_DIR}/crash-reports/' or view the screen buffer with 'screen -r ${SCREEN_NAME}'."
+        print_error "Server failed to start. Check for crash logs in '${SERVER_DIR}/crash-reports/' or the screen log (e.g., '${SERVER_DIR}/screen.0'). You can also view the buffer with 'screen -r ${SCREEN_NAME}'."
     fi
 }
 
