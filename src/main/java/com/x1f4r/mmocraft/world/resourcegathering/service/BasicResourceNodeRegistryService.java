@@ -43,4 +43,17 @@ public class BasicResourceNodeRegistryService implements ResourceNodeRegistrySer
     public Collection<ResourceNodeType> getAllNodeTypes() {
         return Collections.unmodifiableCollection(nodeTypes.values());
     }
+
+    @Override
+    public boolean unregisterNodeType(String typeId) {
+        if (typeId == null) {
+            return false;
+        }
+        ResourceNodeType removed = nodeTypes.remove(typeId);
+        if (removed != null) {
+            logger.info("Unregistered ResourceNodeType: " + typeId);
+            return true;
+        }
+        return false;
+    }
 }

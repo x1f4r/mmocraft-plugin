@@ -23,6 +23,14 @@ public interface LootService {
     void registerLootTable(EntityType mobType, LootTable lootTable);
 
     /**
+     * Removes the loot table associated with a specific mob type.
+     *
+     * @param mobType The {@link EntityType} whose loot table should be removed.
+     * @return {@code true} if a table was removed, {@code false} otherwise.
+     */
+    boolean unregisterLootTable(EntityType mobType);
+
+    /**
      * Retrieves the loot table associated with a specific mob type.
      *
      * @param mobType The {@link EntityType} of the mob.
@@ -44,6 +52,14 @@ public interface LootService {
      * @param lootTable The loot table to register.
      */
     void registerLootTableById(LootTable lootTable);
+
+    /**
+     * Unregisters a generic loot table.
+     *
+     * @param lootTableId ID of the table to remove.
+     * @return {@code true} if a table was removed, {@code false} otherwise.
+     */
+    boolean unregisterLootTableById(String lootTableId);
 
 
     /**

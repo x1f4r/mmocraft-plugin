@@ -21,6 +21,14 @@ public interface ZoneManager {
     void loadZones();
 
     /**
+     * Updates whether the default zone configuration should be copied from the plugin JAR.
+     * Implementations that do not support this behaviour may ignore the call.
+     */
+    default void setCopyDefaultZoneFile(boolean copyDefault) {
+        // no-op by default
+    }
+
+    /**
      * Registers a new zone.
      * @param zone The Zone to register.
      */

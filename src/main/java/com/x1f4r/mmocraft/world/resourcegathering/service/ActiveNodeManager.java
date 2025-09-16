@@ -11,7 +11,9 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -95,6 +97,15 @@ public class ActiveNodeManager {
         return Optional.ofNullable(activeNodes.get(location.getBlock().getLocation()));
     }
 
+    public long countNodesOfType(String nodeTypeId) {
+        if (nodeTypeId == null) {
+            return 0;
+        }
+        return activeNodes.values().stream()
+                .filter(node -> nodeTypeId.equalsIgnoreCase(node.getNodeTypeId()))
+                .count();
+    }
+
     public void depleteNode(ActiveResourceNode node) {
         if (node == null || node.isDepleted()) {
             return;
@@ -144,6 +155,25 @@ public class ActiveNodeManager {
                 respawnNode(node);
             }
         }
+    }
+
+    public int removeNodesByType(String nodeTypeId) {
+        if (nodeTypeId == null) {
+            return 0;
+        }
+        List<Location> locationsToRemove = new ArrayList<>();
+        activeNodes.forEach((location, node) -> {
+            if (nodeTypeId.equalsIgnoreCase(node.getNodeTypeId())) {
+                locationsToRemove.add(location);
+            }
+        });
+        int removed = 0;
+        for (Location location : locationsToRemove) {
+            if (removeNode(location)) {
+                removed++;
+            }
+        }
+        return removed;
     }
 
     public boolean removeNode(Location location) {

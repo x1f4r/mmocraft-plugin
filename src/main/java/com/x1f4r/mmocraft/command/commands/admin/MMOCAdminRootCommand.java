@@ -1,9 +1,9 @@
 package com.x1f4r.mmocraft.command.commands.admin;
 
 import com.x1f4r.mmocraft.command.AbstractPluginCommand;
+import com.x1f4r.mmocraft.command.commands.admin.demo.DemoAdminCommand;
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.util.StringUtil;
-import com.x1f4r.mmocraft.world.resourcegathering.service.ActiveNodeManager; // For permission check example
 import org.bukkit.command.CommandSender;
 
 import java.util.ArrayList;
@@ -23,6 +23,7 @@ public class MMOCAdminRootCommand extends AbstractPluginCommand {
         registerSubCommand("combat", new CombatAdminCommand(plugin));
         registerSubCommand("item", new ItemAdminCommand(plugin));
         registerSubCommand("resource", new ResourceAdminCommand(plugin, "mmocadm resource", "mmocraft.admin.resource"));
+        registerSubCommand("demo", new DemoAdminCommand(plugin));
         // Example: registerSubCommand("config", new ConfigAdminCommand(plugin));
     }
 
