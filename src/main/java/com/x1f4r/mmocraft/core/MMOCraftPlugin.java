@@ -21,23 +21,18 @@ import com.x1f4r.mmocraft.eventbus.EventBusService;
 import com.x1f4r.mmocraft.eventbus.events.PluginReloadedEvent;
 import com.x1f4r.mmocraft.item.equipment.listeners.PlayerEquipmentListener;
 import com.x1f4r.mmocraft.item.equipment.service.PlayerEquipmentManager;
-import com.x1f4r.mmocraft.item.impl.SimpleSword;
-import com.x1f4r.mmocraft.item.impl.TrainingArmor;
 import com.x1f4r.mmocraft.item.service.BasicCustomItemRegistry;
 import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
 import com.x1f4r.mmocraft.loot.listeners.MobDeathLootListener;
-import com.x1f4r.mmocraft.loot.model.LootTable;
-import com.x1f4r.mmocraft.loot.model.LootTableEntry;
-import com.x1f4r.mmocraft.loot.model.LootType;
 import com.x1f4r.mmocraft.loot.service.BasicLootService;
 import com.x1f4r.mmocraft.loot.service.LootService;
+import com.x1f4r.mmocraft.demo.DemoContentModule;
+import com.x1f4r.mmocraft.demo.DemoContentSettings;
 import com.x1f4r.mmocraft.persistence.PersistenceService;
 import com.x1f4r.mmocraft.persistence.SqlitePersistenceService;
 import com.x1f4r.mmocraft.playerdata.BasicPlayerDataService;
 import com.x1f4r.mmocraft.playerdata.PlayerDataService;
 import com.x1f4r.mmocraft.playerdata.listeners.PlayerJoinQuitListener;
-import com.x1f4r.mmocraft.skill.impl.MinorHealSkill;
-import com.x1f4r.mmocraft.skill.impl.StrongStrikeSkill;
 import com.x1f4r.mmocraft.skill.service.BasicSkillRegistryService;
 import com.x1f4r.mmocraft.skill.service.SkillRegistryService;
 import com.x1f4r.mmocraft.statuseffect.manager.BasicStatusEffectManager;
@@ -50,33 +45,13 @@ import com.x1f4r.mmocraft.world.zone.listeners.PlayerZoneTrackerListener;
 import com.x1f4r.mmocraft.world.zone.service.BasicZoneManager;
 import com.x1f4r.mmocraft.world.zone.service.ZoneManager;
 import com.x1f4r.mmocraft.world.resourcegathering.listeners.ResourceNodeInteractionListener;
-import com.x1f4r.mmocraft.world.resourcegathering.model.ResourceNodeType;
 import com.x1f4r.mmocraft.world.resourcegathering.service.ActiveNodeManager;
 import com.x1f4r.mmocraft.world.resourcegathering.service.BasicResourceNodeRegistryService;
 import com.x1f4r.mmocraft.world.resourcegathering.service.ResourceNodeRegistryService;
-import com.x1f4r.mmocraft.world.spawning.conditions.BiomeCondition;
-import com.x1f4r.mmocraft.world.spawning.conditions.SpawnCondition;
-import com.x1f4r.mmocraft.world.spawning.conditions.TimeCondition;
-import com.x1f4r.mmocraft.world.spawning.model.CustomSpawnRule;
-import com.x1f4r.mmocraft.world.spawning.model.MobSpawnDefinition;
-
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.World;
-import org.bukkit.block.Biome;
-import org.bukkit.entity.EntityType;
-import org.bukkit.inventory.EquipmentSlot;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 public final class MMOCraftPlugin extends JavaPlugin {
 
@@ -101,6 +76,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private ActiveNodeManager activeNodeManager;
     private LoggingUtil loggingUtil;
     private DemoContentSettings demoSettings = DemoContentSettings.disabled();
+    private DemoContentModule demoContentModule;
     private BukkitTask statusEffectTickTask;
     private BukkitTask customSpawningTask;
     private BukkitTask resourceNodeTickTask;
@@ -112,7 +88,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
             return;
         }
 
-        loadDemoContentSettings();
+        demoSettings = DemoContentSettings.fromConfig(configService, loggingUtil);
 
         if (!initCoreServices()) {
             getServer().getPluginManager().disablePlugin(this);
@@ -120,7 +96,8 @@ public final class MMOCraftPlugin extends JavaPlugin {
         }
 
         initGameplayServices();
-        registerCustomContent();
+        demoContentModule = new DemoContentModule(this, loggingUtil);
+        applyDemoSettings(demoSettings);
         registerListeners();
         registerCommands();
         startSchedulers();
@@ -133,6 +110,10 @@ public final class MMOCraftPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         loggingUtil.info("MMOCraft shutting down...");
+
+        if (demoContentModule != null) {
+            demoContentModule.unload();
+        }
 
         if (resourceNodeTickTask != null && !resourceNodeTickTask.isCancelled()) {
             resourceNodeTickTask.cancel();
@@ -232,71 +213,6 @@ public final class MMOCraftPlugin extends JavaPlugin {
         loggingUtil.info("All gameplay services initialized.");
     }
 
-    private void loadDemoContentSettings() {
-        if (configService == null) {
-            demoSettings = DemoContentSettings.disabled();
-            return;
-        }
-
-        boolean masterEnabled = configService.getBoolean("demo.enabled");
-        demoSettings = new DemoContentSettings(
-                masterEnabled,
-                masterEnabled && configService.getBoolean("demo.items"),
-                masterEnabled && configService.getBoolean("demo.skills"),
-                masterEnabled && configService.getBoolean("demo.loot-tables"),
-                masterEnabled && configService.getBoolean("demo.custom-spawns"),
-                masterEnabled && configService.getBoolean("demo.resource-nodes"),
-                masterEnabled && configService.getBoolean("demo.zones")
-        );
-
-        if (loggingUtil != null) {
-            if (!demoSettings.masterEnabled()) {
-                loggingUtil.info("Demo content disabled via configuration.");
-            } else if (!demoSettings.allFeatureFlagsEnabled()) {
-                loggingUtil.info("Demo content enabled for: " + demoSettings.describeEnabledFeatures());
-            } else {
-                loggingUtil.debug("All demo content toggles enabled.");
-            }
-        }
-    }
-
-    private void registerCustomContent() {
-        if (demoSettings.itemsEnabled()) {
-            registerCustomItems();
-            loggingUtil.info("Demo custom items registered.");
-        } else {
-            loggingUtil.info("Demo custom items disabled via config; skipping registration.");
-        }
-
-        if (demoSettings.skillsEnabled()) {
-            registerSkills();
-            loggingUtil.info("Demo skills registered.");
-        } else {
-            loggingUtil.info("Demo skills disabled via config; skipping registration.");
-        }
-
-        if (demoSettings.lootTablesEnabled()) {
-            registerDefaultLootTables();
-        } else {
-            loggingUtil.info("Demo loot tables disabled via config; skipping registration.");
-        }
-
-        if (demoSettings.customSpawnsEnabled()) {
-            registerCustomSpawns();
-        } else {
-            loggingUtil.info("Demo custom spawn rules disabled via config; skipping registration.");
-        }
-
-        zoneManager.loadZones();
-
-        if (demoSettings.resourceNodesEnabled()) {
-            registerResourceNodeTypes();
-            placeInitialResourceNodes();
-        } else {
-            loggingUtil.info("Demo resource nodes disabled via config; skipping registration.");
-        }
-    }
-
     private void registerListeners() {
         getServer().getPluginManager().registerEvents(new PlayerJoinQuitListener(playerDataService, loggingUtil), this);
         getServer().getPluginManager().registerEvents(new PlayerZoneTrackerListener(zoneManager, loggingUtil, eventBusService), this);
@@ -362,104 +278,30 @@ public final class MMOCraftPlugin extends JavaPlugin {
     public ResourceNodeRegistryService getResourceNodeRegistryService() { return resourceNodeRegistryService; }
     public ActiveNodeManager getActiveNodeManager() { return activeNodeManager; }
     public LoggingUtil getLoggingUtil() { return loggingUtil; }
+    public DemoContentSettings getDemoSettings() { return demoSettings; }
 
-    private void registerResourceNodeTypes() {
-        if (resourceNodeRegistryService == null || lootService == null) {
-            loggingUtil.severe("ResourceNodeRegistryService or LootService not initialized. Cannot register node types.");
+    public synchronized void applyDemoSettings(DemoContentSettings newSettings) {
+        if (newSettings == null) {
+            loggingUtil.warning("Attempted to apply null demo settings. Ignoring request.");
             return;
         }
-
-        if (lootService.getLootTableById("stone_node_loot").isEmpty()) {
-            LootTable stoneLoot = new LootTable("stone_node_loot", List.of(new LootTableEntry(LootType.VANILLA, "COBBLESTONE", 1.0, 1, 1)));
-            lootService.registerLootTableById(stoneLoot);
-            loggingUtil.info("Registered 'stone_node_loot' table.");
+        demoSettings = newSettings;
+        if (zoneManager instanceof BasicZoneManager basicZoneManager) {
+            basicZoneManager.setCopyDefaultZoneFile(newSettings.zonesEnabled());
         }
-
-        if (lootService.getLootTableById("iron_ore_node_loot").isEmpty()) {
-            LootTable ironLoot = new LootTable("iron_ore_node_loot", List.of(new LootTableEntry(LootType.VANILLA, "RAW_IRON", 1.0, 1, 1)));
-            lootService.registerLootTableById(ironLoot);
-            loggingUtil.info("Registered 'iron_ore_node_loot' table.");
+        if (demoContentModule != null) {
+            demoContentModule.applySettings(newSettings);
         }
-
-        ResourceNodeType stoneNode = new ResourceNodeType("stone_node", Material.STONE, 5.0, Set.of(Material.WOODEN_PICKAXE, Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE), "stone_node_loot", 60, "&7Stone Deposit");
-        resourceNodeRegistryService.registerNodeType(stoneNode);
-
-        ResourceNodeType ironOreNode = new ResourceNodeType("iron_ore_node", Material.IRON_ORE, 10.0, Set.of(Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE), "iron_ore_node_loot", 180, "&fIron Vein");
-        resourceNodeRegistryService.registerNodeType(ironOreNode);
-
-        loggingUtil.info("Registered default resource node types.");
-    }
-
-    private void placeInitialResourceNodes() {
-        if (activeNodeManager == null) {
-            loggingUtil.severe("ActiveNodeManager not initialized. Cannot place initial resource nodes.");
-            return;
+        if (zoneManager != null) {
+            zoneManager.loadZones();
         }
-        if (!activeNodeManager.getAllActiveNodesView().isEmpty()) {
-            loggingUtil.info("Skipping initial resource node placement as nodes were loaded from the database.");
-            return;
-        }
-
-        World defaultWorld = Bukkit.getWorld("world");
-        if (defaultWorld == null && !Bukkit.getWorlds().isEmpty()) {
-            defaultWorld = Bukkit.getWorlds().get(0);
-        }
-        if (defaultWorld == null) {
-            loggingUtil.severe("No worlds loaded. Cannot place initial resource nodes.");
-            return;
-        }
-
-        activeNodeManager.placeNewNode(new Location(defaultWorld, 10, 60, 10), "stone_node");
-        activeNodeManager.placeNewNode(new Location(defaultWorld, 12, 60, 10), "stone_node");
-        activeNodeManager.placeNewNode(new Location(defaultWorld, 10, 60, 12), "iron_ore_node");
-        loggingUtil.info("Placed initial resource nodes in world '" + defaultWorld.getName() + "'.");
-    }
-
-    private void registerSkills() {
-        if (skillRegistryService == null) {
-            loggingUtil.severe("SkillRegistryService not initialized. Cannot register skills.");
-            return;
-        }
-        skillRegistryService.registerSkill(new StrongStrikeSkill(this));
-        skillRegistryService.registerSkill(new MinorHealSkill(this));
-    }
-
-    private void registerCustomItems() {
-        if (customItemRegistry == null) {
-            loggingUtil.severe("CustomItemRegistry not initialized. Cannot register custom items.");
-            return;
-        }
-        customItemRegistry.registerItem(new SimpleSword(this));
-        customItemRegistry.registerItem(new TrainingArmor(this));
-    }
-
-    private void registerDefaultLootTables() {
-        if (lootService == null || customItemRegistry == null) {
-            loggingUtil.severe("LootService or CustomItemRegistry not initialized. Cannot register default loot tables.");
-            return;
-        }
-        LootTable zombieLootTable = new LootTable("zombie_common_drops", List.of(new LootTableEntry("simple_sword", 0.05, 1, 1)));
-        lootService.registerLootTable(EntityType.ZOMBIE, zombieLootTable);
-        loggingUtil.info("Default loot tables registered.");
-    }
-
-    private void registerCustomSpawns() {
-        if (customSpawningService == null) {
-            loggingUtil.severe("CustomSpawningService not initialized. Cannot register custom spawns.");
-            return;
-        }
-
-        MobSpawnDefinition skeletalWarriorDef = new MobSpawnDefinition("skeletal_warrior", EntityType.SKELETON, ChatColor.RED + "Skeletal Warrior", "skeletal_warrior_stats", "warrior_common_loot", Map.of(EquipmentSlot.HAND, new ItemStack(Material.IRON_SWORD)));
-        List<SpawnCondition> conditions = List.of(new BiomeCondition(Set.of(Biome.PLAINS, Biome.MEADOW, Biome.SAVANNA)), new TimeCondition(13000, 23000));
-        CustomSpawnRule warriorRule = new CustomSpawnRule("plains_skeletal_warriors_night", skeletalWarriorDef, conditions, 0.1, 60, 200, 5, 16.0, 200);
-        customSpawningService.registerRule(warriorRule);
-        loggingUtil.info("Default custom spawn rules registered.");
     }
 
     public void reloadPluginConfig() {
         if (configService != null) {
             configService.reloadConfig();
-            loadDemoContentSettings();
+            DemoContentSettings reloadedSettings = DemoContentSettings.fromConfig(configService, loggingUtil);
+            applyDemoSettings(reloadedSettings);
             loggingUtil.info("MMOCraft configuration reloaded via reloadPluginConfig().");
             loggingUtil.info("Default Max Health after reload: " + configService.getInt("stats.max-health"));
             loggingUtil.debug("Debug status after reload: " + (configService.getBoolean("core.debug-logging") ? "enabled" : "disabled") + ".");
@@ -471,51 +313,6 @@ public final class MMOCraftPlugin extends JavaPlugin {
             }
         } else {
             loggingUtil.severe("ConfigService not available. Cannot reload configuration.");
-        }
-    }
-
-    private record DemoContentSettings(
-            boolean masterEnabled,
-            boolean itemsEnabled,
-            boolean skillsEnabled,
-            boolean lootTablesEnabled,
-            boolean customSpawnsEnabled,
-            boolean resourceNodesEnabled,
-            boolean zonesEnabled
-    ) {
-        private static DemoContentSettings disabled() {
-            return new DemoContentSettings(false, false, false, false, false, false, false);
-        }
-
-        private boolean allFeatureFlagsEnabled() {
-            return masterEnabled && itemsEnabled && skillsEnabled && lootTablesEnabled
-                    && customSpawnsEnabled && resourceNodesEnabled && zonesEnabled;
-        }
-
-        private String describeEnabledFeatures() {
-            if (!masterEnabled) {
-                return "none";
-            }
-            List<String> enabled = new ArrayList<>();
-            if (itemsEnabled) {
-                enabled.add("items");
-            }
-            if (skillsEnabled) {
-                enabled.add("skills");
-            }
-            if (lootTablesEnabled) {
-                enabled.add("loot tables");
-            }
-            if (customSpawnsEnabled) {
-                enabled.add("custom spawns");
-            }
-            if (resourceNodesEnabled) {
-                enabled.add("resource nodes");
-            }
-            if (zonesEnabled) {
-                enabled.add("zones");
-            }
-            return enabled.isEmpty() ? "none" : String.join(", ", enabled);
         }
     }
 }

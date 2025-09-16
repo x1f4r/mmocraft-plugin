@@ -18,7 +18,7 @@ public class BasicZoneManager implements ZoneManager {
     private final MMOCraftPlugin plugin;
     private final LoggingUtil logger;
     private final EventBusService eventBusService;
-    private final boolean copyDefaultZoneFile;
+    private volatile boolean copyDefaultZoneFile;
 
     private final Map<String, Zone> zonesById = new ConcurrentHashMap<>();
     private final Map<UUID, Set<String>> playerCurrentZoneIds = new ConcurrentHashMap<>();
@@ -168,6 +168,12 @@ public class BasicZoneManager implements ZoneManager {
         if (removed != null) {
             logger.fine("Cleared zone cache for player " + playerUUID);
         }
+    }
+
+    @Override
+    public void setCopyDefaultZoneFile(boolean copyDefaultZoneFile) {
+        this.copyDefaultZoneFile = copyDefaultZoneFile;
+        logger.info("Zone manager default file copy set to " + copyDefaultZoneFile + ".");
     }
 
     @Override

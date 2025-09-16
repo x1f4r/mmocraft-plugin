@@ -30,4 +30,12 @@ public interface ResourceNodeRegistryService {
      * @return A collection of all {@link ResourceNodeType}s. The collection might be unmodifiable.
      */
     Collection<ResourceNodeType> getAllNodeTypes();
+
+    /**
+     * Removes a previously registered node type.
+     *
+     * @param typeId ID of the node type to remove.
+     * @return {@code true} if a node type was removed, {@code false} otherwise.
+     */
+    boolean unregisterNodeType(String typeId);
 }

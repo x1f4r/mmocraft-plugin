@@ -1,4 +1,4 @@
-package com.x1f4r.mmocraft.item.impl;
+package com.x1f4r.mmocraft.demo.item;
 
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.item.model.CustomItem;
@@ -9,6 +9,9 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Lightweight defensive armor used to showcase armor stat modifiers.
+ */
 public class TrainingArmor extends CustomItem {
 
     public TrainingArmor(MMOCraftPlugin plugin) {
@@ -33,24 +36,21 @@ public class TrainingArmor extends CustomItem {
     @Override
     public List<String> getLore() {
         return List.of(
-            "&7Provides minor protection and resilience.",
-            "&7Suitable for novice adventurers."
-            // Stat modifiers will be added automatically
+                "&7Provides minor protection and resilience.",
+                "&7Suitable for novice adventurers."
         );
     }
 
     @Override
     public Map<Stat, Double> getStatModifiers() {
         Map<Stat, Double> mods = new EnumMap<>(Stat.class);
-        mods.put(Stat.VITALITY, 10.0); // Bonus to health
-        mods.put(Stat.DEFENSE, 5.0);   // Bonus to defense points
+        mods.put(Stat.VITALITY, 10.0);
+        mods.put(Stat.DEFENSE, 5.0);
         return mods;
     }
 
     @Override
     public int getCustomModelData() {
-        // Example: if you have a custom texture for it
-        // return 10001;
         return 0;
     }
 

@@ -168,6 +168,7 @@ The base permission for all admin commands is `mmocraft.admin`.
 | `/mmocadm playerdata setlevel <player> <level>` | Sets a player's level. | `mmocraft.admin.playerdata.setlevel` |
 | `/mmocadm playerdata addxp <player> <amount>` | Adds experience to a player. | `mmocraft.admin.playerdata.addxp` |
 | `/mmocadm playerdata addcurrency <player> <amount>`| Adds or removes currency from a player. | `mmocraft.admin.playerdata.addcurrency` |
+| `/mmocadm demo <status|enable|disable|reload>` | Inspect or change the bundled demo content toggles. | `mmocraft.admin.demo` |
 
 ## For Developers
 

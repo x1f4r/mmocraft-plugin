@@ -47,6 +47,19 @@ public class BasicLootService implements LootService {
     }
 
     @Override
+    public boolean unregisterLootTable(EntityType mobType) {
+        if (mobType == null) {
+            return false;
+        }
+        LootTable removed = mobLootTables.remove(mobType);
+        if (removed != null) {
+            logger.info("Removed loot table for mob type: " + mobType);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
     public Optional<LootTable> getLootTable(EntityType mobType) {
         if (mobType == null) return Optional.empty();
         return Optional.ofNullable(mobLootTables.get(mobType));
@@ -70,6 +83,19 @@ public class BasicLootService implements LootService {
         } else {
             logger.info("Registered generic loot table with ID: " + lootTable.getLootTableId());
         }
+    }
+
+    @Override
+    public boolean unregisterLootTableById(String lootTableId) {
+        if (lootTableId == null || lootTableId.trim().isEmpty()) {
+            return false;
+        }
+        LootTable removed = genericLootTables.remove(lootTableId);
+        if (removed != null) {
+            logger.info("Removed generic loot table with ID: " + lootTableId);
+            return true;
+        }
+        return false;
     }
 
     @Override
