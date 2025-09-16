@@ -99,12 +99,24 @@ This file, located in `/plugins/MMOCraft/`, contains basic settings.
 core:
   debug-logging: false # Set to true to see detailed debug messages in the console.
 
-# Other placeholder settings
 stats:
   max-health: 100
   base-damage: 5
-...
+
+features:
+  pvp-enabled: true
+
+demo:
+  enabled: true
+  items: true
+  skills: true
+  loot-tables: true
+  custom-spawns: true
+  resource-nodes: true
+  zones: true
 ```
+
+The `demo` section controls whether the bundled showcase content (items, skills, loot tables, spawns, zones, and starter resource nodes) is automatically registered. Disable the master toggle or individual flags if you want a clean slate while keeping the engine systems active.
 
 ### `zones.yml`
 This file, located in `/plugins/MMOCraft/`, is used to define custom zones.

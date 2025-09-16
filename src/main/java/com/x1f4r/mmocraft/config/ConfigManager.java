@@ -6,6 +6,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
@@ -17,15 +18,38 @@ public class ConfigManager {
     private final JavaPlugin plugin;
     private final String fileName;
     private final LoggingUtil logger;
+    private final boolean applyDefaultsFromJar;
     private FileConfiguration config;
     private final File configFile;
 
     public ConfigManager(JavaPlugin plugin, String fileName, LoggingUtil logger) {
+        this(plugin, fileName, logger, true);
+    }
+
+    public ConfigManager(JavaPlugin plugin, String fileName, LoggingUtil logger, boolean copyDefaultsFromJar) {
         this.plugin = plugin;
         this.fileName = fileName;
         this.logger = logger;
+        this.applyDefaultsFromJar = copyDefaultsFromJar;
         this.configFile = new File(plugin.getDataFolder(), fileName);
-        saveDefaultConfig();
+
+        if (copyDefaultsFromJar) {
+            saveDefaultConfig();
+        } else if (!configFile.exists()) {
+            File parent = configFile.getParentFile();
+            if (parent != null && !parent.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                parent.mkdirs();
+            }
+            try {
+                if (configFile.createNewFile()) {
+                    logger.info("Created empty '" + fileName + "' because demo content is disabled.");
+                }
+            } catch (IOException e) {
+                logger.severe("Could not create empty '" + fileName + "': " + e.getMessage(), e);
+            }
+        }
+
         loadConfig();
     }
 
@@ -39,11 +63,15 @@ public class ConfigManager {
     public void loadConfig() {
         try {
             config = YamlConfiguration.loadConfiguration(configFile);
-            InputStream defaultConfigStream = plugin.getResource(fileName);
-            if (defaultConfigStream != null) {
-                YamlConfiguration defaultConfig = YamlConfiguration.loadConfiguration(new InputStreamReader(defaultConfigStream));
-                config.setDefaults(defaultConfig);
-                logger.debug("Default values for '" + fileName + "' applied from JAR.");
+            if (applyDefaultsFromJar) {
+                InputStream defaultConfigStream = plugin.getResource(fileName);
+                if (defaultConfigStream != null) {
+                    YamlConfiguration defaultConfig = YamlConfiguration.loadConfiguration(new InputStreamReader(defaultConfigStream));
+                    config.setDefaults(defaultConfig);
+                    logger.debug("Default values for '" + fileName + "' applied from JAR.");
+                }
+            } else {
+                logger.debug("Jar defaults intentionally not applied for '" + fileName + "'.");
             }
         } catch (Exception e) {
             logger.severe("Could not load '" + fileName + "': " + e.getMessage(), e);

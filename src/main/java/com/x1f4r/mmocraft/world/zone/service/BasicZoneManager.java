@@ -18,20 +18,22 @@ public class BasicZoneManager implements ZoneManager {
     private final MMOCraftPlugin plugin;
     private final LoggingUtil logger;
     private final EventBusService eventBusService;
+    private final boolean copyDefaultZoneFile;
 
     private final Map<String, Zone> zonesById = new ConcurrentHashMap<>();
     private final Map<UUID, Set<String>> playerCurrentZoneIds = new ConcurrentHashMap<>();
 
-    public BasicZoneManager(MMOCraftPlugin plugin, LoggingUtil logger, EventBusService eventBusService) {
+    public BasicZoneManager(MMOCraftPlugin plugin, LoggingUtil logger, EventBusService eventBusService, boolean copyDefaultZoneFile) {
         this.plugin = plugin;
         this.logger = logger;
         this.eventBusService = eventBusService;
+        this.copyDefaultZoneFile = copyDefaultZoneFile;
         logger.debug("BasicZoneManager initialized.");
     }
 
     @Override
     public void loadZones() {
-        ConfigManager zoneConfigManager = new ConfigManager(plugin, "zones.yml", logger);
+        ConfigManager zoneConfigManager = new ConfigManager(plugin, "zones.yml", logger, copyDefaultZoneFile);
         ConfigurationSection root = zoneConfigManager.getConfig();
         zonesById.clear();
         logger.info("Loading zones from zones.yml...");
