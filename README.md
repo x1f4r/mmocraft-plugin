@@ -19,7 +19,7 @@ This repository is structured for easy setup and execution. The entire process i
 
 1.  **Clone the repository:**
     ```sh
-    git clone <repository-url>
+    git clone https://github.com/x1f4r/mmocraft-plugin
     cd mmocraft-plugin
     ```
 
