@@ -73,6 +73,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -99,6 +100,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private ResourceNodeRepository resourceNodeRepository;
     private ActiveNodeManager activeNodeManager;
     private LoggingUtil loggingUtil;
+    private DemoContentSettings demoSettings = DemoContentSettings.disabled();
     private BukkitTask statusEffectTickTask;
     private BukkitTask customSpawningTask;
     private BukkitTask resourceNodeTickTask;
@@ -109,6 +111,8 @@ public final class MMOCraftPlugin extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
+
+        loadDemoContentSettings();
 
         if (!initCoreServices()) {
             getServer().getPluginManager().disablePlugin(this);
@@ -218,7 +222,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
         recipeRegistryService = new BasicRecipeRegistryService(this, loggingUtil, customItemRegistry);
         craftingUIManager = new CraftingUIManager(this, recipeRegistryService, playerDataService, customItemRegistry, loggingUtil);
         customSpawningService = new BasicCustomSpawningService(this, loggingUtil, mobStatProvider, lootService, customItemRegistry);
-        zoneManager = new BasicZoneManager(this, loggingUtil, eventBusService);
+        zoneManager = new BasicZoneManager(this, loggingUtil, eventBusService, demoSettings.zonesEnabled());
 
         resourceNodeRegistryService = new BasicResourceNodeRegistryService(loggingUtil);
         resourceNodeRepository = new ResourceNodeRepository(persistenceService, loggingUtil);
@@ -228,22 +232,69 @@ public final class MMOCraftPlugin extends JavaPlugin {
         loggingUtil.info("All gameplay services initialized.");
     }
 
+    private void loadDemoContentSettings() {
+        if (configService == null) {
+            demoSettings = DemoContentSettings.disabled();
+            return;
+        }
+
+        boolean masterEnabled = configService.getBoolean("demo.enabled");
+        demoSettings = new DemoContentSettings(
+                masterEnabled,
+                masterEnabled && configService.getBoolean("demo.items"),
+                masterEnabled && configService.getBoolean("demo.skills"),
+                masterEnabled && configService.getBoolean("demo.loot-tables"),
+                masterEnabled && configService.getBoolean("demo.custom-spawns"),
+                masterEnabled && configService.getBoolean("demo.resource-nodes"),
+                masterEnabled && configService.getBoolean("demo.zones")
+        );
+
+        if (loggingUtil != null) {
+            if (!demoSettings.masterEnabled()) {
+                loggingUtil.info("Demo content disabled via configuration.");
+            } else if (!demoSettings.allFeatureFlagsEnabled()) {
+                loggingUtil.info("Demo content enabled for: " + demoSettings.describeEnabledFeatures());
+            } else {
+                loggingUtil.debug("All demo content toggles enabled.");
+            }
+        }
+    }
+
     private void registerCustomContent() {
-        registerCustomItems();
-        loggingUtil.info("Custom items registered.");
+        if (demoSettings.itemsEnabled()) {
+            registerCustomItems();
+            loggingUtil.info("Demo custom items registered.");
+        } else {
+            loggingUtil.info("Demo custom items disabled via config; skipping registration.");
+        }
 
-        registerSkills();
-        loggingUtil.info("Skills registered.");
+        if (demoSettings.skillsEnabled()) {
+            registerSkills();
+            loggingUtil.info("Demo skills registered.");
+        } else {
+            loggingUtil.info("Demo skills disabled via config; skipping registration.");
+        }
 
-        registerDefaultLootTables();
+        if (demoSettings.lootTablesEnabled()) {
+            registerDefaultLootTables();
+        } else {
+            loggingUtil.info("Demo loot tables disabled via config; skipping registration.");
+        }
 
-        registerCustomSpawns();
+        if (demoSettings.customSpawnsEnabled()) {
+            registerCustomSpawns();
+        } else {
+            loggingUtil.info("Demo custom spawn rules disabled via config; skipping registration.");
+        }
 
         zoneManager.loadZones();
 
-        registerResourceNodeTypes();
-        placeInitialResourceNodes();
-        loggingUtil.info("Resource nodes registered and placed.");
+        if (demoSettings.resourceNodesEnabled()) {
+            registerResourceNodeTypes();
+            placeInitialResourceNodes();
+        } else {
+            loggingUtil.info("Demo resource nodes disabled via config; skipping registration.");
+        }
     }
 
     private void registerListeners() {
@@ -402,11 +453,13 @@ public final class MMOCraftPlugin extends JavaPlugin {
         List<SpawnCondition> conditions = List.of(new BiomeCondition(Set.of(Biome.PLAINS, Biome.MEADOW, Biome.SAVANNA)), new TimeCondition(13000, 23000));
         CustomSpawnRule warriorRule = new CustomSpawnRule("plains_skeletal_warriors_night", skeletalWarriorDef, conditions, 0.1, 60, 200, 5, 16.0, 200);
         customSpawningService.registerRule(warriorRule);
+        loggingUtil.info("Default custom spawn rules registered.");
     }
 
     public void reloadPluginConfig() {
         if (configService != null) {
             configService.reloadConfig();
+            loadDemoContentSettings();
             loggingUtil.info("MMOCraft configuration reloaded via reloadPluginConfig().");
             loggingUtil.info("Default Max Health after reload: " + configService.getInt("stats.max-health"));
             loggingUtil.debug("Debug status after reload: " + (configService.getBoolean("core.debug-logging") ? "enabled" : "disabled") + ".");
@@ -418,6 +471,51 @@ public final class MMOCraftPlugin extends JavaPlugin {
             }
         } else {
             loggingUtil.severe("ConfigService not available. Cannot reload configuration.");
+        }
+    }
+
+    private record DemoContentSettings(
+            boolean masterEnabled,
+            boolean itemsEnabled,
+            boolean skillsEnabled,
+            boolean lootTablesEnabled,
+            boolean customSpawnsEnabled,
+            boolean resourceNodesEnabled,
+            boolean zonesEnabled
+    ) {
+        private static DemoContentSettings disabled() {
+            return new DemoContentSettings(false, false, false, false, false, false, false);
+        }
+
+        private boolean allFeatureFlagsEnabled() {
+            return masterEnabled && itemsEnabled && skillsEnabled && lootTablesEnabled
+                    && customSpawnsEnabled && resourceNodesEnabled && zonesEnabled;
+        }
+
+        private String describeEnabledFeatures() {
+            if (!masterEnabled) {
+                return "none";
+            }
+            List<String> enabled = new ArrayList<>();
+            if (itemsEnabled) {
+                enabled.add("items");
+            }
+            if (skillsEnabled) {
+                enabled.add("skills");
+            }
+            if (lootTablesEnabled) {
+                enabled.add("loot tables");
+            }
+            if (customSpawnsEnabled) {
+                enabled.add("custom spawns");
+            }
+            if (resourceNodesEnabled) {
+                enabled.add("resource nodes");
+            }
+            if (zonesEnabled) {
+                enabled.add("zones");
+            }
+            return enabled.isEmpty() ? "none" : String.join(", ", enabled);
         }
     }
 }
