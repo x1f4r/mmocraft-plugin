@@ -67,7 +67,8 @@ public class SqlitePersistenceService implements PersistenceService {
                                           "info_key TEXT NOT NULL UNIQUE," +
                                           "info_value TEXT NOT NULL" +
                                           ");";
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
+        Connection conn = getConnection();
+        try (Statement stmt = conn.createStatement()) {
             stmt.execute(createPluginInfoTableSql);
             this.log.info("Database initialized and 'plugin_info' table created/verified.");
 
@@ -103,8 +104,8 @@ public class SqlitePersistenceService implements PersistenceService {
 
     @Override
     public <T> Optional<T> executeQuerySingle(String sql, RowMapper<T> mapper, Object... params) throws SQLException {
-        try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        Connection conn = getConnection();
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             setParameters(pstmt, params);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
@@ -118,8 +119,8 @@ public class SqlitePersistenceService implements PersistenceService {
     @Override
     public <T> List<T> executeQueryList(String sql, RowMapper<T> mapper, Object... params) throws SQLException {
         List<T> results = new ArrayList<>();
-        try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        Connection conn = getConnection();
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             setParameters(pstmt, params);
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
@@ -132,8 +133,8 @@ public class SqlitePersistenceService implements PersistenceService {
 
     @Override
     public int executeUpdate(String sql, Object... params) throws SQLException {
-        try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        Connection conn = getConnection();
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             setParameters(pstmt, params);
             return pstmt.executeUpdate();
         }

@@ -12,11 +12,12 @@ SCREEN_NAME="mmocraft_server" # Name for the screen session
 
 # --- Java Settings ---
 MEMORY_ARGS="-Xms2G -Xmx2G"
+JAVA_FLAGS="-Djava.net.preferIPv4Stack=true"
 
 # --- EULA Settings ---
 # Set to "true" to automatically accept the Minecraft EULA.
 # By doing so, you are indicating your agreement to the EULA (https://aka.ms/MinecraftEULA).
-AUTO_ACCEPT_EULA="false"
+AUTO_ACCEPT_EULA="${AUTO_ACCEPT_EULA:-false}"
 
 # --- Helper Functions ---
 function print_info {
@@ -37,6 +38,124 @@ function print_usage {
     echo "  setup     - Performs the initial server setup (download, eula)."
     echo "  build     - Compiles the plugin."
     echo "  deploy    - Copies the built plugin to the server directory."
+}
+
+function ensure_eula_true {
+    local file="$1"
+    local tmp="${file}.tmp"
+
+    if [ ! -f "$file" ]; then
+        printf 'eula=true\n' > "$file"
+        return
+    fi
+
+    if grep -q '^eula=true' "$file"; then
+        return
+    fi
+
+    if ! awk '
+    BEGIN { seen = 0 }
+    {
+        if ($0 ~ /^eula=/) {
+            print "eula=true"
+            seen = 1
+            next
+        }
+        print
+    }
+    END {
+        if (!seen) {
+            print "eula=true"
+        }
+    }
+    ' "$file" > "$tmp"; then
+        rm -f "$tmp"
+        print_error "Failed to update $file."
+        exit 1
+    fi
+
+    mv "$tmp" "$file"
+}
+
+function download_mojang_server_jar {
+    if [ -f "${SERVER_DIR}/cache/mojang_${MINECRAFT_VERSION}.jar" ]; then
+        return 0
+    fi
+
+    if ! command -v python3 &> /dev/null; then
+        print_error "python3 is required to perform the Mojang server JAR fallback download."
+        return 1
+    fi
+
+    local metadata
+    if ! metadata=$(python3 - "$MINECRAFT_VERSION" <<'PY'
+import json
+import sys
+import urllib.request
+
+version = sys.argv[1]
+manifest_url = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
+
+with urllib.request.urlopen(manifest_url) as resp:
+    manifest = json.load(resp)
+
+for entry in manifest['versions']:
+    if entry['id'] == version:
+        version_url = entry['url']
+        break
+else:
+    print('', file=sys.stderr)
+    sys.exit(1)
+
+with urllib.request.urlopen(version_url) as resp:
+    version_data = json.load(resp)
+
+server = version_data.get('downloads', {}).get('server')
+if not server:
+    print('', file=sys.stderr)
+    sys.exit(1)
+
+print(server['url'])
+print(server['sha1'])
+PY
+); then
+        print_error "Failed to resolve Mojang download metadata."
+        return 1
+    fi
+
+    local download_url
+    local expected_sha1
+    download_url=$(echo "$metadata" | sed -n '1p')
+    expected_sha1=$(echo "$metadata" | sed -n '2p')
+
+    if [ -z "$download_url" ] || [ -z "$expected_sha1" ]; then
+        print_error "Received empty Mojang download metadata."
+        return 1
+    fi
+
+    local cache_dir="${SERVER_DIR}/cache"
+    local target_jar="${cache_dir}/mojang_${MINECRAFT_VERSION}.jar"
+    mkdir -p "$cache_dir"
+
+    print_info "Attempting direct download of Mojang server JAR via fallback..."
+    if ! curl -L -o "$target_jar" "$download_url"; then
+        print_error "Fallback download from Mojang failed."
+        rm -f "$target_jar"
+        return 1
+    fi
+
+    if command -v sha1sum &> /dev/null; then
+        local actual_sha
+        actual_sha=$(sha1sum "$target_jar" | awk '{print $1}')
+        if [ "$actual_sha" != "$expected_sha1" ]; then
+            print_error "Checksum mismatch for Mojang server JAR (expected $expected_sha1, got $actual_sha)."
+            rm -f "$target_jar"
+            return 1
+        fi
+    fi
+
+    print_info "Successfully downloaded Mojang server JAR via fallback."
+    return 0
 }
 
 function get_server_port {
@@ -161,13 +280,25 @@ function setup_server {
         # Run server once to generate files if eula.txt doesn't exist
         if [ ! -f "$EULA_PATH" ]; then
             print_info "First-time setup: Generating server files..."
-            (cd "$SERVER_DIR" && java -jar "$JAR_NAME" --initSettings)
+            if ! (cd "$SERVER_DIR" && java $JAVA_FLAGS -jar "$JAR_NAME" --initSettings); then
+                print_error "Initial server setup failed. Attempting fallback Mojang download..."
+                if download_mojang_server_jar; then
+                    print_info "Retrying initial server setup after fallback download..."
+                    if ! (cd "$SERVER_DIR" && java $JAVA_FLAGS -jar "$JAR_NAME" --initSettings); then
+                        print_error "Initial server setup failed even after downloading Mojang assets. Aborting."
+                        exit 1
+                    fi
+                else
+                    print_error "Unable to download Mojang server JAR automatically. See README for manual instructions."
+                    exit 1
+                fi
+            fi
             print_info "Server files generated."
         fi
 
         if [ "$AUTO_ACCEPT_EULA" = "true" ]; then
             print_info "Automatically accepting EULA..."
-            echo "eula=true" > "$EULA_PATH"
+            ensure_eula_true "$EULA_PATH"
             print_info "EULA has been accepted."
         else
             print_info "You need to agree to the Minecraft EULA."
@@ -184,11 +315,7 @@ function setup_server {
             echo # Move to a new line
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 print_info "Accepting EULA..."
-                # Use sed to change eula=false/eula=true (portable syntax for Linux and macOS)
-                if ! sed -i '' 's/eula=false/eula=true/' "$EULA_PATH"; then
-                    print_error "Failed to update eula.txt. Please edit it manually. Aborting."
-                    exit 1
-                fi
+                ensure_eula_true "$EULA_PATH"
                 print_info "EULA has been accepted."
             else
                 print_error "You must agree to the EULA to run the server. Aborting."
@@ -230,7 +357,7 @@ function start_server {
     cd "$SERVER_DIR" || exit
     # Start server in a detached screen session
     # The -L flag enables logging to a file, typically named "screen.0", "screen.1", etc.
-    screen -L -S "$SCREEN_NAME" -d -m java $MEMORY_ARGS -jar "$JAR_NAME" --nogui
+    screen -L -S "$SCREEN_NAME" -d -m java $JAVA_FLAGS $MEMORY_ARGS -jar "$JAR_NAME" --nogui
     cd ..
 
     sleep 3
