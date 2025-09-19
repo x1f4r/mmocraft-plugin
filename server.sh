@@ -10,6 +10,9 @@ SERVER_JAR_PATH="${SERVER_DIR}/${JAR_NAME}"
 EULA_PATH="${SERVER_DIR}/eula.txt"
 SCREEN_NAME="mmocraft_server" # Name for the screen session
 
+DEMO_PREF_DIR="${SERVER_DIR}/plugins/MMOCraft/setup"
+DEMO_PREF_FILE="${DEMO_PREF_DIR}/demo-preferences.properties"
+
 # --- Java Settings ---
 MEMORY_ARGS="-Xms2G -Xmx2G"
 
@@ -37,6 +40,16 @@ function print_usage {
     echo "  setup     - Performs the initial server setup (download, eula)."
     echo "  build     - Compiles the plugin."
     echo "  deploy    - Copies the built plugin to the server directory."
+}
+
+function sed_inplace {
+    local expression="$1"
+    local file="$2"
+    if [[ "${OSTYPE}" == "darwin"* ]]; then
+        sed -i '' "$expression" "$file"
+    else
+        sed -i "$expression" "$file"
+    fi
 }
 
 function get_server_port {
@@ -133,6 +146,8 @@ function deploy_plugin {
     plugin_name=$(basename "$plugin_jar")
     print_info "Found plugin: $plugin_name"
 
+    mkdir -p "${SERVER_DIR}/plugins"
+
     if ! cp "$plugin_jar" "${SERVER_DIR}/plugins/"; then
         print_error "Failed to copy plugin to ${SERVER_DIR}/plugins/. Aborting."
         exit 1
@@ -185,7 +200,7 @@ function setup_server {
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 print_info "Accepting EULA..."
                 # Use sed to change eula=false/eula=true (portable syntax for Linux and macOS)
-                if ! sed -i '' 's/eula=false/eula=true/' "$EULA_PATH"; then
+                if ! sed_inplace 's/eula=false/eula=true/' "$EULA_PATH"; then
                     print_error "Failed to update eula.txt. Please edit it manually. Aborting."
                     exit 1
                 fi
@@ -198,13 +213,25 @@ function setup_server {
     else
         print_info "EULA already accepted."
     fi
+
+    configure_demo_preferences
     print_info "Setup complete."
 }
 
 function is_running {
-    # This is a more reliable way to check if a screen session exists.
-    # It queries the session directly rather than parsing the output of 'screen -list'.
-    screen -S "$SCREEN_NAME" -Q select . &>/dev/null
+    if screen -S "$SCREEN_NAME" -Q select . &>/dev/null; then
+        return 0
+    fi
+
+    if screen -ls | grep -qE "\.${SCREEN_NAME}[[:space:]]" 2>/dev/null; then
+        return 0
+    fi
+
+    if pgrep -f "$JAR_NAME" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    return 1
 }
 
 function start_server {
@@ -217,6 +244,8 @@ function start_server {
         print_error "Server is already running in screen session '$SCREEN_NAME'."
         exit 1
     fi
+
+    cleanup_lingering_processes
 
     build_plugin
     deploy_plugin
@@ -234,11 +263,21 @@ function start_server {
     cd ..
 
     sleep 3
-    if is_running; then
+    if ! is_running; then
+        print_error "Server failed to start. Check for crash logs in '${SERVER_DIR}/crash-reports/' or the screen log (e.g., '${SERVER_DIR}/screen.0'). You can also view the buffer with 'screen -r ${SCREEN_NAME}'."
+        return 1
+    fi
+
+    if wait_for_server_ready; then
+        local port
+        port=$(get_server_port)
         print_info "Server started successfully."
+        print_info "Minecraft server is ready on port ${port}."
+        print_info "You can join using: localhost:${port} (Minecraft ${MINECRAFT_VERSION})."
         print_info "To connect to the console, run: $0 console"
     else
-        print_error "Server failed to start. Check for crash logs in '${SERVER_DIR}/crash-reports/' or the screen log (e.g., '${SERVER_DIR}/screen.0'). You can also view the buffer with 'screen -r ${SCREEN_NAME}'."
+        print_error "Server failed to report ready status. Review the logs in '${SERVER_DIR}/logs/latest.log'."
+        return 1
     fi
 }
 
@@ -269,6 +308,99 @@ function stop_server {
     print_info "Server stop sequence complete."
 }
 
+function wait_for_server_ready {
+    local log_file="${SERVER_DIR}/logs/latest.log"
+    local timeout=180
+    local elapsed=0
+
+    print_info "Waiting for server startup to complete (timeout ${timeout}s)..."
+
+    while [ $elapsed -lt $timeout ]; do
+        if ! is_running; then
+            print_error "Server process is not running while waiting for startup confirmation."
+            return 1
+        fi
+
+        if [ -f "$log_file" ]; then
+            if grep -q "Done (" "$log_file"; then
+                print_info "Server reported startup completion."
+                return 0
+            fi
+        fi
+
+        sleep 3
+        elapsed=$((elapsed + 3))
+    done
+
+    print_error "Timed out waiting for server startup confirmation after ${timeout}s."
+    return 1
+}
+
+function configure_demo_preferences {
+    mkdir -p "$DEMO_PREF_DIR"
+
+    local existing_preference=""
+    if [ -f "$DEMO_PREF_FILE" ]; then
+        existing_preference=$(grep -E '^enable-demo=' "$DEMO_PREF_FILE" | tail -n 1 | cut -d'=' -f2 | tr '[:upper:]' '[:lower:]')
+        if [ "$existing_preference" = "true" ]; then
+            print_info "Current demo content preference: ENABLED"
+        elif [ "$existing_preference" = "false" ]; then
+            print_info "Current demo content preference: DISABLED"
+        fi
+    fi
+
+    if [ ! -t 0 ]; then
+        local default_value="true"
+        if [ -n "$existing_preference" ]; then
+            default_value="$existing_preference"
+        fi
+        save_demo_preference "$default_value"
+        local pretty_pref="ENABLED"
+        if [ "$default_value" = "false" ]; then
+            pretty_pref="DISABLED"
+        fi
+        print_info "Non-interactive shell detected. Demo content preference set to ${pretty_pref}."
+        return
+    fi
+
+    local default_choice="y"
+    if [ "$existing_preference" = "false" ]; then
+        default_choice="n"
+    fi
+
+    local prompt="Enable bundled MMOCraft demo content? [Y/n]: "
+    local answer
+    while true; do
+        read -r -p "$prompt" answer
+        if [ -z "$answer" ]; then
+            answer="$default_choice"
+        fi
+        case "$answer" in
+            [Yy]* )
+                save_demo_preference "true"
+                print_info "Demo content will be ENABLED on next server start."
+                break
+                ;;
+            [Nn]* )
+                save_demo_preference "false"
+                print_info "Demo content will be DISABLED on next server start."
+                break
+                ;;
+            * )
+                echo "Please answer 'y' or 'n'."
+                ;;
+        esac
+    done
+}
+
+function save_demo_preference {
+    local value="$1"
+    {
+        echo "# Generated by server.sh on $(date)"
+        echo "enable-demo=${value}"
+    } > "$DEMO_PREF_FILE"
+}
+
 function server_status {
     if is_running; then
         print_info "Server is RUNNING in screen session '$SCREEN_NAME'."
@@ -287,34 +419,37 @@ function attach_console {
 }
 
 # --- Main Logic ---
+exit_code=0
 case "$1" in
     start)
-        start_server
+        start_server || exit_code=$?
         ;;
     stop)
-        stop_server
+        stop_server || exit_code=$?
         ;;
     restart)
         print_info "Executing server restart..."
-        stop_server
-        print_info "Waiting a few seconds before starting again..."
-        sleep 3
-        start_server
+        stop_server || exit_code=$?
+        if [ $exit_code -eq 0 ]; then
+            print_info "Waiting a few seconds before starting again..."
+            sleep 3
+            start_server || exit_code=$?
+        fi
         ;;
     status)
-        server_status
+        server_status || exit_code=$?
         ;;
     console)
-        attach_console
+        attach_console || exit_code=$?
         ;;
     setup)
-        setup_server
+        setup_server || exit_code=$?
         ;;
     build)
-        build_plugin
+        build_plugin || exit_code=$?
         ;;
     deploy)
-        deploy_plugin
+        deploy_plugin || exit_code=$?
         ;;
     *)
         print_usage
@@ -322,4 +457,4 @@ case "$1" in
         ;;
 esac
 
-exit 0
+exit $exit_code
