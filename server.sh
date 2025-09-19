@@ -70,55 +70,129 @@ function get_server_port {
     fi
 }
 
+function get_server_pids {
+    local pids=""
+
+    if command -v lsof &> /dev/null; then
+        local port
+        port=$(get_server_port)
+        if [ -n "$port" ]; then
+            pids=$(lsof -t -i :"$port" 2>/dev/null | xargs)
+        fi
+    fi
+
+    if [ -z "$pids" ] && command -v pgrep &> /dev/null; then
+        pids=$(pgrep -f "$JAR_NAME" 2>/dev/null | xargs)
+        if [ -z "$pids" ]; then
+            pids=$(pgrep -f "purpur-.*\\.jar" 2>/dev/null | xargs)
+        fi
+    fi
+
+    echo "$pids"
+}
+
+function cleanup_stale_screen_session {
+    if ! command -v screen &> /dev/null; then
+        return
+    fi
+
+    local pids
+    pids=$(get_server_pids)
+
+    if [ -n "$pids" ]; then
+        return
+    fi
+
+    if screen -S "$SCREEN_NAME" -Q select . &>/dev/null; then
+        print_info "Removing stale screen session '${SCREEN_NAME}' from a previous run..."
+        screen -X -S "$SCREEN_NAME" quit >/dev/null 2>&1 || true
+    fi
+
+    local listed
+    listed=$(screen -ls 2>/dev/null | grep -E "\\.${SCREEN_NAME}[[:space:]]" || true)
+    if [ -n "$listed" ]; then
+        print_info "Cleaning up orphaned screen entry for '${SCREEN_NAME}'."
+        screen -wipe "$SCREEN_NAME" >/dev/null 2>&1 || screen -wipe >/dev/null 2>&1 || true
+    fi
+}
+
+function relocate_crash_reports {
+    local logs_dir="${SERVER_DIR}/logs"
+    local crash_dir="${SERVER_DIR}/crash-reports"
+
+    if [ ! -d "$logs_dir" ]; then
+        return
+    fi
+
+    local moved_any=0
+    while IFS= read -r -d '' crash_file; do
+        if [ $moved_any -eq 0 ]; then
+            mkdir -p "$crash_dir"
+            moved_any=1
+        fi
+
+        local filename
+        filename=$(basename "$crash_file")
+        if mv "$crash_file" "${crash_dir}/${filename}"; then
+            print_info "Moved crash report '${filename}' to '${crash_dir}'."
+        else
+            print_error "Failed to move crash report '${filename}' to '${crash_dir}'."
+        fi
+    done < <(find "$logs_dir" -maxdepth 1 -type f \( -name 'crash-*.txt' -o -name 'crash-*.log' -o -name 'crash-*.gz' \) -print0)
+}
+
 function cleanup_lingering_processes {
     print_info "Checking for lingering server processes..."
-    # Check if lsof command exists, as it's the most reliable way to find a process by port
-    if ! command -v lsof &> /dev/null; then
-        print_info "'lsof' is not available. Skipping check for lingering processes by port."
-        # As a fallback, we can still try to kill any stray screen sessions.
-        if is_running; then
-            print_info "Terminating stray screen session '${SCREEN_NAME}'..."
-            screen -X -S "${SCREEN_NAME}" quit
-        fi
-        return
+
+    local have_lsof=0
+    if command -v lsof &> /dev/null; then
+        have_lsof=1
     fi
 
     local server_port
     server_port=$(get_server_port)
-    # The -t flag gives just the PID, making it easy to script with.
-    # The -i :<port> flag finds processes using that TCP/UDP port.
-    local pid
-    pid=$(lsof -t -i :"$server_port")
+    local pids
+    pids=$(get_server_pids)
 
-    if [ -n "$pid" ]; then
-        print_info "Found lingering process on port $server_port with PID $pid. Terminating..."
-        # Try to terminate gracefully first with SIGTERM
-        if kill "$pid"; then
-            local count=0
-            # Wait up to 10 seconds for the process to die
-            while kill -0 "$pid" 2>/dev/null; do
-                sleep 1
-                count=$((count + 1))
-                if [ $count -gt 10 ]; then
-                    print_error "Process $pid did not terminate after 10 seconds. Forcing shutdown (SIGKILL)..."
-                    kill -9 "$pid"
-                    sleep 2 # Give OS time to reap the process
-                    break
+    if [ -n "$pids" ]; then
+        print_info "Found lingering process(es) using the server port or JAR: $pids. Terminating..."
+        for pid in $pids; do
+            if kill "$pid" >/dev/null 2>&1; then
+                local count=0
+                while kill -0 "$pid" 2>/dev/null; do
+                    sleep 1
+                    count=$((count + 1))
+                    if [ $count -gt 10 ]; then
+                        print_error "Process $pid did not terminate after 10 seconds. Forcing shutdown (SIGKILL)..."
+                        kill -9 "$pid" >/dev/null 2>&1 || true
+                        sleep 2
+                        break
+                    fi
+                done
+                if kill -0 "$pid" 2>/dev/null; then
+                    print_error "Process $pid could not be terminated."
+                else
+                    print_info "Process $pid terminated."
                 fi
-            done
-            print_info "Process terminated."
-        else
-            print_error "Failed to send termination signal to process $pid. It may already be gone."
-        fi
+            else
+                print_error "Failed to send termination signal to process $pid. It may already be gone."
+            fi
+        done
     else
-        print_info "No lingering process found on port $server_port."
+        if [ $have_lsof -eq 1 ]; then
+            print_info "No lingering process found on port $server_port."
+        else
+            print_info "'lsof' is not available. No lingering server process detected via fallback search."
+        fi
     fi
 
-    # Also make sure the screen session is gone, in case it's alive but the process isn't listening.
-    if is_running; then
-        print_info "Terminating stray screen session '${SCREEN_NAME}'..."
-        screen -X -S "${SCREEN_NAME}" quit
-    fi
+    cleanup_stale_screen_session
+    relocate_crash_reports
+}
+
+function handle_failed_start {
+    print_info "Performing cleanup after failed server start..."
+    cleanup_lingering_processes
 }
 
 # --- Core Functions ---
@@ -219,16 +293,22 @@ function setup_server {
 }
 
 function is_running {
-    if screen -S "$SCREEN_NAME" -Q select . &>/dev/null; then
+    local pids
+    pids=$(get_server_pids)
+
+    if [ -n "$pids" ]; then
         return 0
     fi
 
-    if screen -ls | grep -qE "\.${SCREEN_NAME}[[:space:]]" 2>/dev/null; then
-        return 0
-    fi
+    cleanup_stale_screen_session
 
-    if pgrep -f "$JAR_NAME" >/dev/null 2>&1; then
-        return 0
+    if command -v screen &> /dev/null; then
+        if screen -S "$SCREEN_NAME" -Q select . &>/dev/null; then
+            return 0
+        fi
+        if screen -ls 2>/dev/null | grep -qE "\.${SCREEN_NAME}[[:space:]]"; then
+            return 0
+        fi
     fi
 
     return 1
@@ -240,12 +320,38 @@ function start_server {
         exit 1
     fi
 
-    if is_running; then
-        print_error "Server is already running in screen session '$SCREEN_NAME'."
-        exit 1
+    local existing_pids
+    existing_pids=$(get_server_pids)
+    local attempted_stop=0
+
+    if [ -n "$existing_pids" ]; then
+        print_info "Existing server process detected (PID(s): $existing_pids). Attempting to stop it before starting fresh..."
+        stop_server
+        attempted_stop=1
     fi
 
-    cleanup_lingering_processes
+    if [ $attempted_stop -eq 0 ]; then
+        cleanup_lingering_processes
+    fi
+
+    if is_running; then
+        local remaining_pids
+        remaining_pids=$(get_server_pids)
+        if [ $attempted_stop -eq 1 ]; then
+            if [ -n "$remaining_pids" ]; then
+                print_error "An existing server instance is still running in screen session '$SCREEN_NAME' after cleanup (PID(s): $remaining_pids). Please stop it manually and try again."
+            else
+                print_error "An existing server instance is still running in screen session '$SCREEN_NAME' after cleanup. Please stop it manually and try again."
+            fi
+        else
+            if [ -n "$remaining_pids" ]; then
+                print_error "Server is already running in screen session '$SCREEN_NAME' (PID(s): $remaining_pids)."
+            else
+                print_error "Server is already running in screen session '$SCREEN_NAME'."
+            fi
+        fi
+        exit 1
+    fi
 
     build_plugin
     deploy_plugin
@@ -265,6 +371,7 @@ function start_server {
     sleep 3
     if ! is_running; then
         print_error "Server failed to start. Check for crash logs in '${SERVER_DIR}/crash-reports/' or the screen log (e.g., '${SERVER_DIR}/screen.0'). You can also view the buffer with 'screen -r ${SCREEN_NAME}'."
+        handle_failed_start
         return 1
     fi
 
@@ -277,6 +384,7 @@ function start_server {
         print_info "To connect to the console, run: $0 console"
     else
         print_error "Server failed to report ready status. Review the logs in '${SERVER_DIR}/logs/latest.log'."
+        handle_failed_start
         return 1
     fi
 }
