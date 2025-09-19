@@ -51,7 +51,12 @@ import com.x1f4r.mmocraft.world.resourcegathering.service.ResourceNodeRegistrySe
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Locale;
+import java.util.Properties;
 
 public final class MMOCraftPlugin extends JavaPlugin {
 
@@ -88,7 +93,8 @@ public final class MMOCraftPlugin extends JavaPlugin {
             return;
         }
 
-        demoSettings = DemoContentSettings.fromConfig(configService, loggingUtil);
+        DemoContentSettings configuredSettings = DemoContentSettings.fromConfig(configService, loggingUtil);
+        demoSettings = applySetupPreferenceOverrides(configuredSettings);
 
         if (!initCoreServices()) {
             getServer().getPluginManager().disablePlugin(this);
@@ -280,6 +286,43 @@ public final class MMOCraftPlugin extends JavaPlugin {
     public LoggingUtil getLoggingUtil() { return loggingUtil; }
     public DemoContentSettings getDemoSettings() { return demoSettings; }
 
+    private DemoContentSettings applySetupPreferenceOverrides(DemoContentSettings baseSettings) {
+        if (baseSettings == null) {
+            return DemoContentSettings.disabled();
+        }
+
+        File setupDir = new File(getDataFolder(), "setup");
+        File overrideFile = new File(setupDir, "demo-preferences.properties");
+        if (!overrideFile.exists()) {
+            return baseSettings;
+        }
+
+        Properties properties = new Properties();
+        try (FileReader reader = new FileReader(overrideFile)) {
+            properties.load(reader);
+        } catch (IOException ex) {
+            loggingUtil.warning("Failed to read demo setup preferences: " + ex.getMessage());
+            return baseSettings;
+        }
+
+        String rawValue = properties.getProperty("enable-demo");
+        if (rawValue == null) {
+            loggingUtil.warning("Demo setup preferences are missing 'enable-demo'. Ignoring override.");
+            return baseSettings;
+        }
+
+        String normalized = rawValue.trim().toLowerCase(Locale.ROOT);
+        if (!normalized.equals("true") && !normalized.equals("false")) {
+            loggingUtil.warning("Invalid value for 'enable-demo' in demo setup preferences: '" + rawValue + "'. Expected true or false.");
+            return baseSettings;
+        }
+
+        boolean enableDemo = Boolean.parseBoolean(normalized);
+        DemoContentSettings overridden = baseSettings.withAllFeatures(enableDemo);
+        loggingUtil.info("Demo content " + (enableDemo ? "force-enabled" : "force-disabled") + " via setup preference file.");
+        return overridden;
+    }
+
     public synchronized void applyDemoSettings(DemoContentSettings newSettings) {
         if (newSettings == null) {
             loggingUtil.warning("Attempted to apply null demo settings. Ignoring request.");
@@ -301,6 +344,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
         if (configService != null) {
             configService.reloadConfig();
             DemoContentSettings reloadedSettings = DemoContentSettings.fromConfig(configService, loggingUtil);
+            reloadedSettings = applySetupPreferenceOverrides(reloadedSettings);
             applyDemoSettings(reloadedSettings);
             loggingUtil.info("MMOCraft configuration reloaded via reloadPluginConfig().");
             loggingUtil.info("Default Max Health after reload: " + configService.getInt("stats.max-health"));
