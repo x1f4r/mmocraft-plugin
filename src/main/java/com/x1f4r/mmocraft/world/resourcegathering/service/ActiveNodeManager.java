@@ -7,6 +7,7 @@ import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.world.resourcegathering.model.ActiveResourceNode;
 import com.x1f4r.mmocraft.world.resourcegathering.model.ResourceNodeType;
 import com.x1f4r.mmocraft.world.resourcegathering.persistence.ResourceNodeRepository;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -45,7 +46,7 @@ public class ActiveNodeManager {
         activeNodes.putAll(loadedNodes);
         logger.info("Finished loading " + activeNodes.size() + " nodes. Verifying world state...");
 
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
+        runSync(() -> {
             for (ActiveResourceNode node : activeNodes.values()) {
                 Optional<ResourceNodeType> nodeTypeOpt = nodeRegistryService.getNodeType(node.getNodeTypeId());
                 if (nodeTypeOpt.isEmpty()) {
@@ -86,7 +87,7 @@ public class ActiveNodeManager {
         activeNodes.put(blockLocation, newNode);
         resourceNodeRepository.saveOrUpdateNode(newNode); // PERSIST
 
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
+        runSync(() -> {
             blockLocation.getBlock().setType(nodeType.getDisplayMaterial());
             logger.info("Placed new resource node '" + nodeTypeId + "' at " + blockLocationToString(blockLocation));
         });
@@ -121,7 +122,7 @@ public class ActiveNodeManager {
         node.setRespawnAtMillis(System.currentTimeMillis() + (nodeType.getRespawnTimeSeconds() * 1000L));
         resourceNodeRepository.saveOrUpdateNode(node); // PERSIST
 
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
+        runSync(() -> {
             node.getLocation().getBlock().setType(depletedMaterial);
             logger.debug("Depleted node '" + node.getNodeTypeId() + "' at " + blockLocationToString(node.getLocation()) + ". Respawning in " + nodeType.getRespawnTimeSeconds() + "s.");
         });
@@ -142,7 +143,7 @@ public class ActiveNodeManager {
         node.setRespawnAtMillis(0);
         resourceNodeRepository.saveOrUpdateNode(node); // PERSIST
 
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
+        runSync(() -> {
             node.getLocation().getBlock().setType(nodeType.getDisplayMaterial());
             logger.debug("Respawned node '" + node.getNodeTypeId() + "' at " + blockLocationToString(node.getLocation()));
         });
@@ -181,7 +182,7 @@ public class ActiveNodeManager {
         ActiveResourceNode node = activeNodes.remove(blockLocation);
         if (node != null) {
             resourceNodeRepository.deleteNode(node); // PERSIST
-            plugin.getServer().getScheduler().runTask(plugin, () -> {
+            runSync(() -> {
                 blockLocation.getBlock().setType(Material.AIR);
                 logger.info("Removed resource node '" + node.getNodeTypeId() + "' from " + blockLocationToString(blockLocation));
             });
@@ -205,5 +206,13 @@ public class ActiveNodeManager {
             resourceNodeRepository.saveOrUpdateNode(node);
         }
         logger.info("All active resource node states have been persisted.");
+    }
+
+    private void runSync(Runnable task) {
+        if (!plugin.isEnabled() || Bukkit.isPrimaryThread()) {
+            task.run();
+        } else {
+            plugin.getServer().getScheduler().runTask(plugin, task);
+        }
     }
 }

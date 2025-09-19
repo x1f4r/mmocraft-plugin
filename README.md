@@ -162,6 +162,7 @@ The base permission for all admin commands is `mmocraft.admin`.
 | Command | Description | Permission |
 | --- | --- | --- |
 | `/mmocadm item give <player> <itemId> [amount]` | Gives a player a custom item. | `mmocraft.admin.item.give` |
+| `/mmocadm item list [filter] [page]` | Lists the registered custom items, optionally filtered. | `mmocraft.admin.item.list` |
 | `/mmocadm combat testdamage <attacker> <victim> [weapon]` | Simulates a damage calculation. | `mmocraft.admin.combat.testdamage` |
 | `/mmocadm playerdata view <player>` | Views a player's profile data. | `mmocraft.admin.playerdata.view` |
 | `/mmocadm playerdata setstat <player> <stat> <value>` | Sets a player's core stat. | `mmocraft.admin.playerdata.setstat` |
@@ -169,6 +170,7 @@ The base permission for all admin commands is `mmocraft.admin`.
 | `/mmocadm playerdata addxp <player> <amount>` | Adds experience to a player. | `mmocraft.admin.playerdata.addxp` |
 | `/mmocadm playerdata addcurrency <player> <amount>`| Adds or removes currency from a player. | `mmocraft.admin.playerdata.addcurrency` |
 | `/mmocadm demo <status|enable|disable|reload>` | Inspect or change the bundled demo content toggles. | `mmocraft.admin.demo` |
+| `/mmocadm diagnostics` | Runs a plugin health report and logs warnings/errors. | `mmocraft.admin.diagnostics` |
 
 ## For Developers
 

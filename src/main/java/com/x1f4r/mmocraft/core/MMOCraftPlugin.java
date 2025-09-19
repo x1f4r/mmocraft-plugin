@@ -19,6 +19,7 @@ import com.x1f4r.mmocraft.crafting.ui.CraftingUIManager;
 import com.x1f4r.mmocraft.eventbus.BasicEventBusService;
 import com.x1f4r.mmocraft.eventbus.EventBusService;
 import com.x1f4r.mmocraft.eventbus.events.PluginReloadedEvent;
+import com.x1f4r.mmocraft.diagnostics.PluginDiagnosticsService;
 import com.x1f4r.mmocraft.item.equipment.listeners.PlayerEquipmentListener;
 import com.x1f4r.mmocraft.item.equipment.service.PlayerEquipmentManager;
 import com.x1f4r.mmocraft.item.service.BasicCustomItemRegistry;
@@ -85,6 +86,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private BukkitTask statusEffectTickTask;
     private BukkitTask customSpawningTask;
     private BukkitTask resourceNodeTickTask;
+    private PluginDiagnosticsService diagnosticsService;
 
     @Override
     public void onEnable() {
@@ -217,6 +219,16 @@ public final class MMOCraftPlugin extends JavaPlugin {
         activeNodeManager = new ActiveNodeManager(this, loggingUtil, resourceNodeRegistryService, resourceNodeRepository, lootService, customItemRegistry);
 
         loggingUtil.info("All gameplay services initialized.");
+
+        diagnosticsService = new PluginDiagnosticsService(
+                loggingUtil,
+                customItemRegistry,
+                skillRegistryService,
+                activeNodeManager,
+                resourceNodeRegistryService,
+                configService,
+                persistenceService
+        );
     }
 
     private void registerListeners() {
@@ -285,6 +297,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
     public ActiveNodeManager getActiveNodeManager() { return activeNodeManager; }
     public LoggingUtil getLoggingUtil() { return loggingUtil; }
     public DemoContentSettings getDemoSettings() { return demoSettings; }
+    public PluginDiagnosticsService getDiagnosticsService() { return diagnosticsService; }
 
     private DemoContentSettings applySetupPreferenceOverrides(DemoContentSettings baseSettings) {
         if (baseSettings == null) {
