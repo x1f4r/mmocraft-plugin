@@ -1,0 +1,27 @@
+metadata:
+  profession: foraging
+nodes:
+  - id: default:sky_pine
+    display: "Sky Pine"
+    block: SPRUCE_LOG
+    tier: 2
+    respawn-seconds: 60
+    drops:
+      - type: vanilla
+        material: SPRUCE_LOG
+        amount: 4-6
+      - type: custom
+        item: default:gustaxe
+        chance: 0.01
+  - id: default:ancient_bloom
+    display: "Ancient Bloom"
+    block: AZALEA
+    tier: 4
+    respawn-seconds: 240
+    drops:
+      - type: vanilla
+        material: FLOWERING_AZALEA
+        amount: 1-2
+      - type: currency
+        currency: druidic_spore
+        amount: 5-9

@@ -1,0 +1,15 @@
+achievements:
+  - id: default:first_steps
+    name: "First Steps"
+    description: "Reach Combat level 5."
+    rewards:
+      currency:
+        coins: 500
+  - id: default:ember_conqueror
+    name: "Ember Conqueror"
+    description: "Defeat the Ember Titan encounter."
+    rewards:
+      items:
+        - default:ember_staff
+      currency:
+        ember_shard: 50

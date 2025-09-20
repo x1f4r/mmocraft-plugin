@@ -1,0 +1,41 @@
+islands:
+  - id: default:ember_keep
+    name: "Ember Keep"
+    generator:
+      type: layered_noise
+      seed: 481516
+      settings:
+        top-material: TERRACOTTA
+        sub-material: STONE
+        radius: 96
+    points-of-interest:
+      - id: forge_heart
+        schematic: ember_forge
+        position:
+          x: 0
+          y: 76
+          z: 0
+        facing: SOUTH
+      - id: titan_gate
+        schematic: titan_gate
+        position:
+          x: 34
+          y: 72
+          z: -22
+        facing: EAST
+  - id: default:verdant_reach
+    name: "Verdant Reach"
+    generator:
+      type: floating_isles
+      seed: 932184
+      settings:
+        biome: LUSH_CAVES
+        island-count: 5
+    points-of-interest:
+      - id: druidic_grove
+        schematic: druidic_grove
+        position:
+          x: -18
+          y: 80
+          z: 14
+        facing: NORTH

@@ -1,0 +1,27 @@
+metadata:
+  profession: farming
+plots:
+  - id: default:wheat_plot
+    display: "Harvest Fields"
+    crop: WHEAT
+    base-yield: 2
+    respawn-seconds: 30
+    extras:
+      - type: vanilla
+        material: WHEAT_SEEDS
+        amount: 1-3
+      - type: experience
+        profession: farming
+        amount: 8
+  - id: default:glowroot_patch
+    display: "Glowroot Patch"
+    crop: CARROTS
+    base-yield: 4
+    respawn-seconds: 60
+    extras:
+      - type: custom
+        item: default:mana_tonic
+        chance: 0.05
+      - type: currency
+        currency: guild_token
+        amount: 1-2

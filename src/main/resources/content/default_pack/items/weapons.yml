@@ -1,0 +1,38 @@
+metadata:
+  category: weapons
+  pack: default
+items:
+  - id: default:training_blade
+    name: "&aTraining Blade"
+    material: WOODEN_SWORD
+    rarity: COMMON
+    stats:
+      STRENGTH: 5
+      CRITICAL_CHANCE: 5
+    lore:
+      - "&7A simple blade issued to every recruit."
+      - "&7Grants a small amount of combat mastery."
+  - id: default:ember_staff
+    name: "&cEmber Staff"
+    material: BLAZE_ROD
+    rarity: RARE
+    stats:
+      INTELLIGENCE: 18
+      ABILITY_POWER: 30
+    abilities:
+      - ember_burst
+    lore:
+      - "&6Ignites foes with concentrated embers."
+      - "&7Right Click: &cEmber Burst"
+  - id: default:wind_lasher
+    name: "&bWind Lasher"
+    material: IRON_SWORD
+    rarity: EPIC
+    stats:
+      STRENGTH: 25
+      ATTACK_SPEED: 15
+    abilities:
+      - gale_dash
+    lore:
+      - "&7Forged to slice through the fiercest storms."
+      - "&7Shift + Right Click: &bGale Dash"

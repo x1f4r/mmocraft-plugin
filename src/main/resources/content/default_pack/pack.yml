@@ -1,0 +1,11 @@
+id: default
+name: Default Content Pack
+version: 0.1.0
+authors:
+  - MMOCraft Team
+description: |
+  Reference MMO content featuring combat, gathering, crafting, and economy samples.
+  Safe to extend or replace when building custom experiences.
+tags:
+  - baseline
+  - reference

@@ -1,0 +1,22 @@
+categories:
+  - id: weapons
+    name: "Weapons"
+    icon: IRON_SWORD
+    recipes:
+      - default:ember_staff
+      - default:training_blade
+  - id: armor
+    name: "Armor"
+    icon: DIAMOND_CHESTPLATE
+    recipes:
+      - default:sentinel_boots
+  - id: tools
+    name: "Tools"
+    icon: DIAMOND_PICKAXE
+    recipes:
+      - default:prospector_pickaxe
+  - id: consumables
+    name: "Consumables"
+    icon: POTION
+    recipes:
+      - default:mana_tonic

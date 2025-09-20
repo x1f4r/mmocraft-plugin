@@ -1,0 +1,37 @@
+metadata:
+  category: tools
+  pack: default
+items:
+  - id: default:prospector_pickaxe
+    name: "&6Prospector's Pickaxe"
+    material: DIAMOND_PICKAXE
+    rarity: RARE
+    profession: mining
+    stats:
+      MINING_FORTUNE: 45
+      MINING_SPEED: 30
+    lore:
+      - "&7Excels at uncovering rich ore veins."
+      - "&7Break resource nodes for bonus shards."
+  - id: default:verdant_scythe
+    name: "&aVerdant Scythe"
+    material: IRON_HOE
+    rarity: UNCOMMON
+    profession: farming
+    stats:
+      FARMING_FORTUNE: 30
+      FARMING_SPEED: 20
+    lore:
+      - "&7Greatly improves crop yield on cultivated plots."
+  - id: default:gustaxe
+    name: "&bGustaxe"
+    material: DIAMOND_AXE
+    rarity: EPIC
+    profession: foraging
+    stats:
+      FORAGING_FORTUNE: 50
+      FORAGING_SPEED: 40
+    abilities:
+      - timberwhirl
+    lore:
+      - "&7Unleash a cyclone to fell surrounding trees."

@@ -1,0 +1,34 @@
+quests:
+  - id: default:ember_rising
+    name: "Ember Rising"
+    description: "Aid the forge master in calming the embers."
+    giver: default:blacksmith
+    objectives:
+      - type: gather
+        item: default:ember_staff
+        amount: 1
+      - type: defeat
+        family: default:emberling
+        amount: 12
+    rewards:
+      items:
+        - default:sentinel_boots
+      currency:
+        coins: 2500
+        ember_shard: 20
+  - id: default:grove_whispers
+    name: "Grove Whispers"
+    description: "Earn the trust of the druids by tending to the grove."
+    giver: druid_elder
+    objectives:
+      - type: harvest
+        node: default:ancient_bloom
+        amount: 6
+      - type: deliver
+        item: default:verdant_scythe
+        to: druid_elder
+    rewards:
+      currency:
+        druidic_spore: 40
+      unlocks:
+        - ability: timberwhirl

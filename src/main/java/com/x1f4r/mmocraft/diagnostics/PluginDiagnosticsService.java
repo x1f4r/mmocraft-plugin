@@ -10,6 +10,9 @@ import com.x1f4r.mmocraft.config.gameplay.StatScalingConfig;
 import com.x1f4r.mmocraft.crafting.model.CustomRecipeIngredient;
 import com.x1f4r.mmocraft.crafting.recipe.CustomRecipe;
 import com.x1f4r.mmocraft.crafting.service.RecipeRegistryService;
+import com.x1f4r.mmocraft.content.ContentPack;
+import com.x1f4r.mmocraft.content.ContentPackIssue;
+import com.x1f4r.mmocraft.content.ContentPackService;
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.demo.DemoContentSettings;
 import com.x1f4r.mmocraft.item.equipment.listeners.PlayerEquipmentListener;
@@ -74,6 +77,7 @@ public class PluginDiagnosticsService {
     private final ActiveNodeManager activeNodeManager;
     private final ResourceNodeRegistryService resourceNodeRegistryService;
     private final GameplayConfigService gameplayConfigService;
+    private final ContentPackService contentPackService;
     private final PersistenceService persistenceService;
     private final RecipeRegistryService recipeRegistryService;
     private final Supplier<DemoContentSettings> demoSettingsSupplier;
@@ -87,6 +91,7 @@ public class PluginDiagnosticsService {
             ActiveNodeManager activeNodeManager,
             ResourceNodeRegistryService resourceNodeRegistryService,
             GameplayConfigService gameplayConfigService,
+            ContentPackService contentPackService,
             PersistenceService persistenceService,
             RecipeRegistryService recipeRegistryService,
             Supplier<DemoContentSettings> demoSettingsSupplier,
@@ -99,6 +104,7 @@ public class PluginDiagnosticsService {
         this.activeNodeManager = activeNodeManager;
         this.resourceNodeRegistryService = resourceNodeRegistryService;
         this.gameplayConfigService = gameplayConfigService;
+        this.contentPackService = contentPackService;
         this.persistenceService = persistenceService;
         this.recipeRegistryService = recipeRegistryService;
         this.demoSettingsSupplier = demoSettingsSupplier;
@@ -108,6 +114,7 @@ public class PluginDiagnosticsService {
 
     public List<DiagnosticEntry> runDiagnostics() {
         List<DiagnosticEntry> results = new ArrayList<>();
+        checkContentPacks(results);
         checkCustomItems(results);
         checkSkills(results);
         checkConfig(results);
@@ -123,6 +130,39 @@ public class PluginDiagnosticsService {
         return runDiagnostics().stream()
                 .filter(DiagnosticEntry::isIssue)
                 .collect(Collectors.toList());
+    }
+
+    private void checkContentPacks(List<DiagnosticEntry> results) {
+        if (contentPackService == null) {
+            results.add(entry(Severity.ERROR,
+                    "Content pack service is unavailable.",
+                    "The loader failed to initialise; restart the server to deploy default packs."));
+            return;
+        }
+
+        List<ContentPack> packs = contentPackService.getLoadedPacks();
+        if (packs == null || packs.isEmpty()) {
+            results.add(entry(Severity.ERROR,
+                    "No content packs are loaded.",
+                    "Ensure content/packs.yml references at least one enabled pack."));
+        } else {
+            String detail = packs.stream()
+                    .map(pack -> pack.id() + "@" + pack.version())
+                    .collect(Collectors.joining(", "));
+            results.add(entry(Severity.INFO, "Content packs loaded: " + packs.size(), detail));
+        }
+
+        for (ContentPackIssue issue : contentPackService.getIssues()) {
+            if (issue == null) {
+                continue;
+            }
+            Severity severity = switch (issue.severity()) {
+                case ERROR -> Severity.ERROR;
+                case WARNING -> Severity.WARNING;
+                default -> Severity.INFO;
+            };
+            results.add(entry(severity, issue.message(), issue.detail()));
+        }
     }
 
     private void checkCustomItems(List<DiagnosticEntry> results) {
