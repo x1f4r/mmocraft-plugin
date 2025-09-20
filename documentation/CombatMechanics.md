@@ -53,16 +53,13 @@ The damage calculation considers several factors:
 
 *   **Attacker's Stats (from `PlayerProfile` if Player):**
     *   `STRENGTH`: Increases physical damage.
-    *   `INTELLIGENCE`: (Conceptually) Increases magical damage.
-    *   `AGILITY` & `LUCK`: Contribute to critical hit chance.
-    *   `criticalHitChance`: Derived stat determining the chance of a critical hit.
-    *   `criticalDamageBonus`: Derived stat determining the damage multiplier on a critical hit.
+    *   `INTELLIGENCE` & `ABILITY_POWER`: Drive magical/ability damage scaling.
+    *   `CRITICAL_CHANCE`: Feeds into the derived `criticalHitChance` percentage.
+    *   `CRITICAL_DAMAGE`: Feeds into the derived `criticalDamageBonus` multiplier.
 *   **Victim's Stats (from `PlayerProfile` if Player, or `MobStatProvider` if Mob):**
-    *   `AGILITY` & `LUCK` (Player): Contribute to evasion chance.
-    *   `evasionChance` (Player): Derived stat determining chance to evade an attack.
-    *   `DEFENSE` (Player/Mob): Contributes to physical damage reduction.
-    *   `WISDOM` (Player/Mob, example): Can contribute to magical damage reduction.
-    *   `physicalDamageReduction` / `magicDamageReduction` (Player): Derived stats reducing incoming damage.
+    *   `EVASION` (Player): Contributes to the derived `evasionChance` when dodging attacks.
+    *   `DEFENSE` and `TRUE_DEFENSE`: Combine (with diminishing returns) to reduce incoming damage.
+    *   `physicalDamageReduction` / `magicDamageReduction` (Player): Derived stats reducing incoming damage based on defense values.
 *   **Base Weapon/Mob Attack Damage:** The initial damage value before most modifiers.
 *   **`DamageType` Enum:**
     *   `PHYSICAL`: Standard physical attacks, subject to physical defenses.

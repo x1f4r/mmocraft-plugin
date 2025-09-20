@@ -8,80 +8,73 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Immutable view of the player stat scaling configuration.
+ * Immutable view of stat scaling and derived combat configuration.
  */
 public final class StatScalingConfig {
 
-    private final long baseHealth;
-    private final double healthPerVitality;
-    private final double healthPerLevel;
-    private final long baseMana;
-    private final double manaPerWisdom;
-    private final double manaPerLevel;
-    private final double baseCriticalHitChance;
-    private final double critChancePerAgility;
-    private final double critChancePerLuck;
-    private final double baseCriticalDamageBonus;
-    private final double critDamageBonusPerStrength;
-    private final double baseEvasionChance;
-    private final double evasionPerAgility;
-    private final double evasionPerLuck;
-    private final double physReductionPerDefense;
-    private final double maxPhysReduction;
-    private final double magicReductionPerWisdom;
-    private final double maxMagicReduction;
-    private final double defaultStatBaseValue;
+    private final double defaultStatInvestment;
     private final Map<Stat, Double> defaultStatOverrides;
+    private final Map<Stat, StatRule> statRules;
+    private final double defenseReductionBase;
+    private final double trueDefenseReductionBase;
+    private final double maxDamageReduction;
+    private final double maxEvasionChance;
 
     private StatScalingConfig(Builder builder) {
-        this.baseHealth = builder.baseHealth;
-        this.healthPerVitality = builder.healthPerVitality;
-        this.healthPerLevel = builder.healthPerLevel;
-        this.baseMana = builder.baseMana;
-        this.manaPerWisdom = builder.manaPerWisdom;
-        this.manaPerLevel = builder.manaPerLevel;
-        this.baseCriticalHitChance = builder.baseCriticalHitChance;
-        this.critChancePerAgility = builder.critChancePerAgility;
-        this.critChancePerLuck = builder.critChancePerLuck;
-        this.baseCriticalDamageBonus = builder.baseCriticalDamageBonus;
-        this.critDamageBonusPerStrength = builder.critDamageBonusPerStrength;
-        this.baseEvasionChance = builder.baseEvasionChance;
-        this.evasionPerAgility = builder.evasionPerAgility;
-        this.evasionPerLuck = builder.evasionPerLuck;
-        this.physReductionPerDefense = builder.physReductionPerDefense;
-        this.maxPhysReduction = builder.maxPhysReduction;
-        this.magicReductionPerWisdom = builder.magicReductionPerWisdom;
-        this.maxMagicReduction = builder.maxMagicReduction;
-        this.defaultStatBaseValue = builder.defaultStatBaseValue;
+        this.defaultStatInvestment = builder.defaultStatInvestment;
         this.defaultStatOverrides = Collections.unmodifiableMap(new EnumMap<>(builder.defaultStatOverrides));
+
+        Map<Stat, StatRule> rules = new EnumMap<>(Stat.class);
+        for (Stat stat : Stat.values()) {
+            StatRule rule = builder.statRules.get(stat);
+            if (rule == null) {
+                rule = StatRule.builder().build();
+            }
+            rules.put(stat, rule);
+        }
+        this.statRules = Collections.unmodifiableMap(rules);
+
+        this.defenseReductionBase = builder.defenseReductionBase;
+        this.trueDefenseReductionBase = builder.trueDefenseReductionBase;
+        this.maxDamageReduction = builder.maxDamageReduction;
+        this.maxEvasionChance = builder.maxEvasionChance;
     }
 
-    public long getBaseHealth() { return baseHealth; }
-    public double getHealthPerVitality() { return healthPerVitality; }
-    public double getHealthPerLevel() { return healthPerLevel; }
-    public long getBaseMana() { return baseMana; }
-    public double getManaPerWisdom() { return manaPerWisdom; }
-    public double getManaPerLevel() { return manaPerLevel; }
-    public double getBaseCriticalHitChance() { return baseCriticalHitChance; }
-    public double getCritChancePerAgility() { return critChancePerAgility; }
-    public double getCritChancePerLuck() { return critChancePerLuck; }
-    public double getBaseCriticalDamageBonus() { return baseCriticalDamageBonus; }
-    public double getCritDamageBonusPerStrength() { return critDamageBonusPerStrength; }
-    public double getBaseEvasionChance() { return baseEvasionChance; }
-    public double getEvasionPerAgility() { return evasionPerAgility; }
-    public double getEvasionPerLuck() { return evasionPerLuck; }
-    public double getPhysReductionPerDefense() { return physReductionPerDefense; }
-    public double getMaxPhysReduction() { return maxPhysReduction; }
-    public double getMagicReductionPerWisdom() { return magicReductionPerWisdom; }
-    public double getMaxMagicReduction() { return maxMagicReduction; }
-    public double getDefaultStatBaseValue() { return defaultStatBaseValue; }
+    public double getDefaultStatInvestment() {
+        return defaultStatInvestment;
+    }
 
     public Map<Stat, Double> getDefaultStatOverrides() {
         return defaultStatOverrides;
     }
 
     public double getDefaultStatValue(Stat stat) {
-        return defaultStatOverrides.getOrDefault(Objects.requireNonNull(stat), defaultStatBaseValue);
+        return defaultStatOverrides.getOrDefault(Objects.requireNonNull(stat), defaultStatInvestment);
+    }
+
+    public StatRule getStatRule(Stat stat) {
+        StatRule rule = statRules.get(Objects.requireNonNull(stat));
+        return rule == null ? StatRule.builder().build() : rule;
+    }
+
+    public Map<Stat, StatRule> getStatRules() {
+        return statRules;
+    }
+
+    public double getDefenseReductionBase() {
+        return defenseReductionBase;
+    }
+
+    public double getTrueDefenseReductionBase() {
+        return trueDefenseReductionBase;
+    }
+
+    public double getMaxDamageReduction() {
+        return maxDamageReduction;
+    }
+
+    public double getMaxEvasionChance() {
+        return maxEvasionChance;
     }
 
     public Builder toBuilder() {
@@ -98,101 +91,191 @@ public final class StatScalingConfig {
 
     public static StatScalingConfig defaults() {
         Builder builder = new Builder();
-        builder.baseHealth = 50L;
-        builder.healthPerVitality = 5.0;
-        builder.healthPerLevel = 2.0;
-        builder.baseMana = 20L;
-        builder.manaPerWisdom = 3.0;
-        builder.manaPerLevel = 1.0;
-        builder.baseCriticalHitChance = 0.05;
-        builder.critChancePerAgility = 0.005;
-        builder.critChancePerLuck = 0.002;
-        builder.baseCriticalDamageBonus = 1.5;
-        builder.critDamageBonusPerStrength = 0.01;
-        builder.baseEvasionChance = 0.02;
-        builder.evasionPerAgility = 0.004;
-        builder.evasionPerLuck = 0.001;
-        builder.physReductionPerDefense = 0.005;
-        builder.maxPhysReduction = 0.80;
-        builder.magicReductionPerWisdom = 0.003;
-        builder.maxMagicReduction = 0.80;
-        builder.defaultStatBaseValue = 10.0;
-        builder.defaultStatOverrides = new EnumMap<>(Stat.class);
-        builder.defaultStatOverrides.put(Stat.VITALITY, 12.0);
-        builder.defaultStatOverrides.put(Stat.WISDOM, 11.0);
+        builder.defaultStatInvestment = 0.0;
+
+        builder.statRule(Stat.HEALTH, StatRule.builder()
+                .baseValue(100.0)
+                .perPoint(1.0)
+                .perLevel(5.0)
+                .minValue(1.0)
+                .build());
+
+        builder.statRule(Stat.DEFENSE, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(1.0)
+                .perLevel(0.5)
+                .diminishingReturns(new DiminishingReturns(1000.0, 0.5))
+                .build());
+
+        builder.statRule(Stat.TRUE_DEFENSE, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(1.0)
+                .perLevel(0.25)
+                .build());
+
+        builder.statRule(Stat.STRENGTH, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(1.0)
+                .perLevel(0.75)
+                .build());
+
+        builder.statRule(Stat.CRITICAL_CHANCE, StatRule.builder()
+                .baseValue(30.0)
+                .perPoint(0.5)
+                .perLevel(0.25)
+                .minValue(0.0)
+                .maxValue(100.0)
+                .build());
+
+        builder.statRule(Stat.CRITICAL_DAMAGE, StatRule.builder()
+                .baseValue(50.0)
+                .perPoint(1.0)
+                .perLevel(0.5)
+                .minValue(0.0)
+                .build());
+
+        builder.statRule(Stat.INTELLIGENCE, StatRule.builder()
+                .baseValue(100.0)
+                .perPoint(1.0)
+                .perLevel(3.0)
+                .minValue(0.0)
+                .build());
+
+        builder.statRule(Stat.MANA_REGEN, StatRule.builder()
+                .baseValue(5.0)
+                .perPoint(0.25)
+                .perLevel(0.1)
+                .minValue(0.0)
+                .build());
+
+        builder.statRule(Stat.ABILITY_POWER, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(1.0)
+                .perLevel(0.5)
+                .minValue(0.0)
+                .build());
+
+        builder.statRule(Stat.ATTACK_SPEED, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(0.5)
+                .perLevel(0.2)
+                .minValue(0.0)
+                .maxValue(100.0)
+                .build());
+
+        builder.statRule(Stat.FEROCITY, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(0.5)
+                .perLevel(0.2)
+                .minValue(0.0)
+                .build());
+
+        builder.statRule(Stat.EVASION, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(0.5)
+                .perLevel(0.2)
+                .minValue(0.0)
+                .maxValue(60.0)
+                .build());
+
+        builder.statRule(Stat.SPEED, StatRule.builder()
+                .baseValue(100.0)
+                .perPoint(0.25)
+                .perLevel(0.15)
+                .minValue(0.0)
+                .maxValue(400.0)
+                .build());
+
+        builder.statRule(Stat.MAGIC_FIND, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(0.25)
+                .perLevel(0.05)
+                .minValue(0.0)
+                .build());
+
+        builder.statRule(Stat.PET_LUCK, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(0.1)
+                .perLevel(0.05)
+                .build());
+
+        builder.statRule(Stat.MINING_SPEED, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(2.0)
+                .perLevel(1.0)
+                .minValue(0.0)
+                .build());
+
+        builder.statRule(Stat.MINING_FORTUNE, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(1.0)
+                .perLevel(0.5)
+                .minValue(0.0)
+                .build());
+
+        builder.statRule(Stat.FARMING_FORTUNE, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(1.0)
+                .perLevel(0.5)
+                .minValue(0.0)
+                .build());
+
+        builder.statRule(Stat.FORAGING_FORTUNE, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(1.0)
+                .perLevel(0.5)
+                .minValue(0.0)
+                .build());
+
+        builder.statRule(Stat.FISHING_FORTUNE, StatRule.builder()
+                .baseValue(0.0)
+                .perPoint(1.0)
+                .perLevel(0.5)
+                .minValue(0.0)
+                .build());
+
+        builder.defenseReductionBase = 100.0;
+        builder.trueDefenseReductionBase = 100.0;
+        builder.maxDamageReduction = 0.90;
+        builder.maxEvasionChance = 0.60;
+
         return builder.build();
     }
 
     public static final class Builder {
-        private long baseHealth;
-        private double healthPerVitality;
-        private double healthPerLevel;
-        private long baseMana;
-        private double manaPerWisdom;
-        private double manaPerLevel;
-        private double baseCriticalHitChance;
-        private double critChancePerAgility;
-        private double critChancePerLuck;
-        private double baseCriticalDamageBonus;
-        private double critDamageBonusPerStrength;
-        private double baseEvasionChance;
-        private double evasionPerAgility;
-        private double evasionPerLuck;
-        private double physReductionPerDefense;
-        private double maxPhysReduction;
-        private double magicReductionPerWisdom;
-        private double maxMagicReduction;
-        private double defaultStatBaseValue;
-        private Map<Stat, Double> defaultStatOverrides;
+        private double defaultStatInvestment;
+        private final Map<Stat, Double> defaultStatOverrides;
+        private final Map<Stat, StatRule> statRules;
+        private double defenseReductionBase;
+        private double trueDefenseReductionBase;
+        private double maxDamageReduction;
+        private double maxEvasionChance;
 
         private Builder() {
             this.defaultStatOverrides = new EnumMap<>(Stat.class);
+            this.statRules = new EnumMap<>(Stat.class);
+            this.defenseReductionBase = 100.0;
+            this.trueDefenseReductionBase = 100.0;
+            this.maxDamageReduction = 0.90;
+            this.maxEvasionChance = 0.60;
         }
 
         private Builder(StatScalingConfig seed) {
             this();
             Objects.requireNonNull(seed, "seed");
-            this.baseHealth = seed.baseHealth;
-            this.healthPerVitality = seed.healthPerVitality;
-            this.healthPerLevel = seed.healthPerLevel;
-            this.baseMana = seed.baseMana;
-            this.manaPerWisdom = seed.manaPerWisdom;
-            this.manaPerLevel = seed.manaPerLevel;
-            this.baseCriticalHitChance = seed.baseCriticalHitChance;
-            this.critChancePerAgility = seed.critChancePerAgility;
-            this.critChancePerLuck = seed.critChancePerLuck;
-            this.baseCriticalDamageBonus = seed.baseCriticalDamageBonus;
-            this.critDamageBonusPerStrength = seed.critDamageBonusPerStrength;
-            this.baseEvasionChance = seed.baseEvasionChance;
-            this.evasionPerAgility = seed.evasionPerAgility;
-            this.evasionPerLuck = seed.evasionPerLuck;
-            this.physReductionPerDefense = seed.physReductionPerDefense;
-            this.maxPhysReduction = seed.maxPhysReduction;
-            this.magicReductionPerWisdom = seed.magicReductionPerWisdom;
-            this.maxMagicReduction = seed.maxMagicReduction;
-            this.defaultStatBaseValue = seed.defaultStatBaseValue;
+            this.defaultStatInvestment = seed.defaultStatInvestment;
             this.defaultStatOverrides.putAll(seed.defaultStatOverrides);
+            this.statRules.putAll(seed.statRules);
+            this.defenseReductionBase = seed.defenseReductionBase;
+            this.trueDefenseReductionBase = seed.trueDefenseReductionBase;
+            this.maxDamageReduction = seed.maxDamageReduction;
+            this.maxEvasionChance = seed.maxEvasionChance;
         }
 
-        public Builder baseHealth(long value) { this.baseHealth = value; return this; }
-        public Builder healthPerVitality(double value) { this.healthPerVitality = value; return this; }
-        public Builder healthPerLevel(double value) { this.healthPerLevel = value; return this; }
-        public Builder baseMana(long value) { this.baseMana = value; return this; }
-        public Builder manaPerWisdom(double value) { this.manaPerWisdom = value; return this; }
-        public Builder manaPerLevel(double value) { this.manaPerLevel = value; return this; }
-        public Builder baseCriticalHitChance(double value) { this.baseCriticalHitChance = value; return this; }
-        public Builder critChancePerAgility(double value) { this.critChancePerAgility = value; return this; }
-        public Builder critChancePerLuck(double value) { this.critChancePerLuck = value; return this; }
-        public Builder baseCriticalDamageBonus(double value) { this.baseCriticalDamageBonus = value; return this; }
-        public Builder critDamageBonusPerStrength(double value) { this.critDamageBonusPerStrength = value; return this; }
-        public Builder baseEvasionChance(double value) { this.baseEvasionChance = value; return this; }
-        public Builder evasionPerAgility(double value) { this.evasionPerAgility = value; return this; }
-        public Builder evasionPerLuck(double value) { this.evasionPerLuck = value; return this; }
-        public Builder physReductionPerDefense(double value) { this.physReductionPerDefense = value; return this; }
-        public Builder maxPhysReduction(double value) { this.maxPhysReduction = value; return this; }
-        public Builder magicReductionPerWisdom(double value) { this.magicReductionPerWisdom = value; return this; }
-        public Builder maxMagicReduction(double value) { this.maxMagicReduction = value; return this; }
-        public Builder defaultStatBaseValue(double value) { this.defaultStatBaseValue = value; return this; }
+        public Builder defaultStatInvestment(double value) {
+            this.defaultStatInvestment = value;
+            return this;
+        }
 
         public Builder setOverride(Stat stat, double value) {
             this.defaultStatOverrides.put(Objects.requireNonNull(stat), value);
@@ -207,8 +290,181 @@ public final class StatScalingConfig {
             return this;
         }
 
+        public Builder statRule(Stat stat, StatRule rule) {
+            this.statRules.put(Objects.requireNonNull(stat), Objects.requireNonNull(rule));
+            return this;
+        }
+
+        public Builder defenseReductionBase(double value) {
+            this.defenseReductionBase = value;
+            return this;
+        }
+
+        public Builder trueDefenseReductionBase(double value) {
+            this.trueDefenseReductionBase = value;
+            return this;
+        }
+
+        public Builder maxDamageReduction(double value) {
+            this.maxDamageReduction = value;
+            return this;
+        }
+
+        public Builder maxEvasionChance(double value) {
+            this.maxEvasionChance = value;
+            return this;
+        }
+
         public StatScalingConfig build() {
             return new StatScalingConfig(this);
         }
     }
+
+    public static final class DiminishingReturns {
+        private final double threshold;
+        private final double multiplier;
+
+        public DiminishingReturns(double threshold, double multiplier) {
+            this.threshold = threshold;
+            this.multiplier = multiplier;
+        }
+
+        public double threshold() {
+            return threshold;
+        }
+
+        public double multiplier() {
+            return multiplier;
+        }
+
+        public double apply(double value) {
+            if (value <= threshold) {
+                return value;
+            }
+            double extra = value - threshold;
+            double scaledExtra = extra * multiplier;
+            return threshold + scaledExtra;
+        }
+    }
+
+    public static final class StatRule {
+        private final double baseValue;
+        private final double perPoint;
+        private final double perLevel;
+        private final double minValue;
+        private final Double maxValue;
+        private final DiminishingReturns diminishingReturns;
+
+        private StatRule(Builder builder) {
+            this.baseValue = builder.baseValue;
+            this.perPoint = builder.perPoint;
+            this.perLevel = builder.perLevel;
+            this.minValue = builder.minValue;
+            this.maxValue = builder.maxValue;
+            this.diminishingReturns = builder.diminishingReturns;
+        }
+
+        public double getBaseValue() {
+            return baseValue;
+        }
+
+        public double getPerPoint() {
+            return perPoint;
+        }
+
+        public double getPerLevel() {
+            return perLevel;
+        }
+
+        public double getMinValue() {
+            return minValue;
+        }
+
+        public Double getMaxValue() {
+            return maxValue;
+        }
+
+        public DiminishingReturns getDiminishingReturns() {
+            return diminishingReturns;
+        }
+
+        public double compute(double invested, int level) {
+            int effectiveLevel = Math.max(level, 1);
+            double value = baseValue + (invested * perPoint) + ((effectiveLevel - 1) * perLevel);
+            if (diminishingReturns != null) {
+                value = diminishingReturns.apply(value);
+            }
+            if (value < minValue) {
+                value = minValue;
+            }
+            if (maxValue != null) {
+                value = Math.min(value, maxValue);
+            }
+            return value;
+        }
+
+        public Builder toBuilder() {
+            return new Builder(this);
+        }
+
+        public static Builder builder() {
+            return new Builder();
+        }
+
+        public static final class Builder {
+            private double baseValue = 0.0;
+            private double perPoint = 1.0;
+            private double perLevel = 0.0;
+            private double minValue = 0.0;
+            private Double maxValue = null;
+            private DiminishingReturns diminishingReturns = null;
+
+            private Builder() {
+            }
+
+            private Builder(StatRule seed) {
+                this.baseValue = seed.baseValue;
+                this.perPoint = seed.perPoint;
+                this.perLevel = seed.perLevel;
+                this.minValue = seed.minValue;
+                this.maxValue = seed.maxValue;
+                this.diminishingReturns = seed.diminishingReturns;
+            }
+
+            public Builder baseValue(double value) {
+                this.baseValue = value;
+                return this;
+            }
+
+            public Builder perPoint(double value) {
+                this.perPoint = value;
+                return this;
+            }
+
+            public Builder perLevel(double value) {
+                this.perLevel = value;
+                return this;
+            }
+
+            public Builder minValue(double value) {
+                this.minValue = value;
+                return this;
+            }
+
+            public Builder maxValue(Double value) {
+                this.maxValue = value;
+                return this;
+            }
+
+            public Builder diminishingReturns(DiminishingReturns diminishingReturns) {
+                this.diminishingReturns = diminishingReturns;
+                return this;
+            }
+
+            public StatRule build() {
+                return new StatRule(this);
+            }
+        }
+    }
 }
+

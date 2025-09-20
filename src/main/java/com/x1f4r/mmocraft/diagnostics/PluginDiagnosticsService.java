@@ -7,6 +7,7 @@ import com.x1f4r.mmocraft.item.model.CustomItem;
 import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
 import com.x1f4r.mmocraft.persistence.PersistenceService;
 import com.x1f4r.mmocraft.skill.model.Skill;
+import com.x1f4r.mmocraft.playerdata.model.Stat;
 import com.x1f4r.mmocraft.skill.service.SkillRegistryService;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.world.resourcegathering.model.ActiveResourceNode;
@@ -108,11 +109,12 @@ public class PluginDiagnosticsService {
         }
 
         StatScalingConfig stats = gameplayConfigService.getStatScalingConfig();
-        if (stats.getBaseHealth() <= 0) {
+        double baseHealth = stats.getStatRule(Stat.HEALTH).getBaseValue();
+        if (baseHealth <= 0) {
             results.add(entry(Severity.ERROR, "Base health from stats.yml is not positive.",
-                    "Update derived.base-health to a value greater than zero."));
+                    "Update the health scaling to use a value greater than zero."));
         } else {
-            results.add(entry(Severity.INFO, "Base health configured to " + stats.getBaseHealth()));
+            results.add(entry(Severity.INFO, "Base health configured to " + baseHealth));
         }
 
         for (GameplayConfigIssue issue : gameplayConfigService.getIssues()) {

@@ -39,6 +39,7 @@ import com.x1f4r.mmocraft.playerdata.BasicPlayerDataService;
 import com.x1f4r.mmocraft.playerdata.PlayerDataService;
 import com.x1f4r.mmocraft.playerdata.listeners.PlayerJoinQuitListener;
 import com.x1f4r.mmocraft.playerdata.model.PlayerProfile;
+import com.x1f4r.mmocraft.playerdata.model.Stat;
 import com.x1f4r.mmocraft.skill.service.BasicSkillRegistryService;
 import com.x1f4r.mmocraft.skill.service.SkillRegistryService;
 import com.x1f4r.mmocraft.statuseffect.manager.BasicStatusEffectManager;
@@ -127,7 +128,8 @@ public final class MMOCraftPlugin extends JavaPlugin {
         startSchedulers();
 
         loggingUtil.info("MMOCraft core loaded and all services initialized!");
-        loggingUtil.info("Default Max Health from config: " + gameplayConfigService.getStatScalingConfig().getBaseHealth());
+        loggingUtil.info("Default Max Health from config: " + gameplayConfigService.getStatScalingConfig()
+                .getStatRule(Stat.HEALTH).getBaseValue());
         loggingUtil.debug("onEnable sequence completed. Debug logging is " + (configService.getBoolean("core.debug-logging") ? "enabled" : "disabled") + ".");
     }
 
@@ -264,7 +266,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
     }
 
     private void registerCommands() {
-        commandRegistryService.registerCommand("mmoc", new MMOCraftInfoCommand(this, "mmoc", "mmocraft.command.info", "Base command for MMOCraft.", loggingUtil));
+        commandRegistryService.registerCommand("mmoc", new MMOCraftInfoCommand(this, "mmoc", "mmocraft.command.info", "Base command for MMOCraft.", loggingUtil, playerDataService));
         commandRegistryService.registerCommand("useskill", new ExecuteSkillCommand(this));
         commandRegistryService.registerCommand("mmocadm", new MMOCAdminRootCommand(this));
         commandRegistryService.registerCommand("customcraft", new CustomCraftCommand(this));
@@ -398,7 +400,8 @@ public final class MMOCraftPlugin extends JavaPlugin {
             reloadedSettings = applySetupPreferenceOverrides(reloadedSettings);
             applyDemoSettings(reloadedSettings);
             loggingUtil.info("MMOCraft configuration reloaded via reloadPluginConfig().");
-            loggingUtil.info("Default Max Health after reload: " + gameplayConfigService.getStatScalingConfig().getBaseHealth());
+            loggingUtil.info("Default Max Health after reload: " + gameplayConfigService.getStatScalingConfig()
+                    .getStatRule(Stat.HEALTH).getBaseValue());
             loggingUtil.debug("Debug status after reload: " + (configService.getBoolean("core.debug-logging") ? "enabled" : "disabled") + ".");
 
             var issues = gameplayConfigService.getIssues();

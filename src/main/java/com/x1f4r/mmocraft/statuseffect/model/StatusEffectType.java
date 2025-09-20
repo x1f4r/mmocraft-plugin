@@ -9,13 +9,15 @@ public enum StatusEffectType {
     HEALTH_REGEN(true, false, "Health Regeneration"), // Regeneration over time
     MANA_REGEN(true, false, "Mana Regeneration"),     // Mana regeneration over time
     STAT_BUFF_STRENGTH(true, false, "Strength Buff"), // Temporary increase to Strength
-    STAT_BUFF_AGILITY(true, false, "Agility Buff"),   // Temporary increase to Agility
-    STAT_BUFF_INTELLIGENCE(true, false, "Intelligence Buff"),
     STAT_BUFF_DEFENSE(true, false, "Defense Buff"),
-    STAT_BUFF_VITALITY(true, false, "Vitality Buff"),
-    STAT_BUFF_WISDOM(true, false, "Wisdom Buff"),
-    STAT_BUFF_LUCK(true, false, "Luck Buff"),
-    STAT_BUFF_PERCEPTION(true, false, "Perception Buff"),
+    STAT_BUFF_HEALTH(true, false, "Health Buff"),
+    STAT_BUFF_INTELLIGENCE(true, false, "Intelligence Buff"),
+    STAT_BUFF_CRIT_CHANCE(true, false, "Critical Chance Buff"),
+    STAT_BUFF_CRIT_DAMAGE(true, false, "Critical Damage Buff"),
+    STAT_BUFF_ABILITY_POWER(true, false, "Ability Power Buff"),
+    STAT_BUFF_SPEED(true, false, "Speed Buff"),
+    STAT_BUFF_FEROCITY(true, false, "Ferocity Buff"),
+    STAT_BUFF_EVASION(true, false, "Evasion Buff"),
     MOVEMENT_SPEED_BUFF(true, false, "Speed Buff"),   // Increased movement speed
     DAMAGE_ABSORPTION_SHIELD(true, false, "Absorption Shield"), // Shield that absorbs a certain amount of damage
 

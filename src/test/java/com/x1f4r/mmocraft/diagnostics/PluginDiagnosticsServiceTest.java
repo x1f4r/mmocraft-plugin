@@ -7,6 +7,7 @@ import com.x1f4r.mmocraft.item.model.CustomItem;
 import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
 import com.x1f4r.mmocraft.persistence.PersistenceService;
 import com.x1f4r.mmocraft.skill.model.Skill;
+import com.x1f4r.mmocraft.playerdata.model.Stat;
 import com.x1f4r.mmocraft.skill.service.SkillRegistryService;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.world.resourcegathering.model.ActiveResourceNode;
@@ -49,8 +50,6 @@ class PluginDiagnosticsServiceTest {
     @Mock
     private GameplayConfigService gameplayConfigService;
     @Mock
-    private StatScalingConfig statScalingConfig;
-    @Mock
     private PersistenceService persistenceService;
     @Mock
     private Connection connection;
@@ -61,8 +60,10 @@ class PluginDiagnosticsServiceTest {
     void setUp() throws SQLException {
         lenient().when(skillRegistryService.getAllSkills()).thenReturn(defaultSkills());
         lenient().when(customItemRegistry.getAllItems()).thenReturn(defaultItems());
+        StatScalingConfig statScalingConfig = StatScalingConfig.builder()
+                .statRule(Stat.HEALTH, StatScalingConfig.StatRule.builder().baseValue(100.0).build())
+                .build();
         lenient().when(gameplayConfigService.getStatScalingConfig()).thenReturn(statScalingConfig);
-        lenient().when(statScalingConfig.getBaseHealth()).thenReturn(100L);
         lenient().when(gameplayConfigService.getIssues()).thenReturn(List.of());
         lenient().when(persistenceService.getConnection()).thenReturn(connection);
         lenient().when(connection.isClosed()).thenReturn(false);

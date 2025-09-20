@@ -50,16 +50,23 @@ The `Stat` enum defines the set of core statistics that every player profile pos
 
 **Defined Core Stats:**
 
-*   **`STRENGTH`**: Primarily influences physical damage output and potentially carrying capacity or other physical feats. Also contributes to critical damage bonus.
-*   **`AGILITY`**: Affects attack speed, critical hit chance, and evasion chance.
-*   **`INTELLIGENCE`**: Governs magical damage, effectiveness of spells, and potentially magic resistance.
-*   **`DEFENSE`**: Reduces incoming physical damage.
-*   **`VITALITY`**: Directly increases maximum health points.
-*   **`WISDOM`**: Directly increases maximum mana points and can influence mana regeneration or magic resistance (contributes to magic damage reduction in the current model).
-*   **`LUCK`**: Influences various probabilistic game events, such as rare item drop rates, critical hit chance, and evasion.
-*   **`PERCEPTION`**: Can affect detection capabilities, accuracy, or chance to find hidden things.
+*   **`HEALTH`**: Drives the player's maximum health pool.
+*   **`DEFENSE`**: Reduces incoming non-true damage using a configurable diminishing returns curve.
+*   **`TRUE_DEFENSE`**: Mitigates true damage sources that bypass regular defense.
+*   **`STRENGTH`**: Increases physical/weapon damage and contributes to critical damage scaling.
+*   **`CRITICAL_CHANCE`**: Percentage chance for attacks to crit (capped by configuration).
+*   **`CRITICAL_DAMAGE`**: Increases the bonus damage dealt by critical strikes.
+*   **`INTELLIGENCE`**: Governs mana capacity and spell potency.
+*   **`MANA_REGEN`**: Boosts passive mana regeneration.
+*   **`ABILITY_POWER`**: Adds percentage-based modifiers to ability and spell damage/healing.
+*   **`ATTACK_SPEED`**: Influences weapon swing speed.
+*   **`FEROCITY`**: Provides chances to deliver additional hits.
+*   **`EVASION`**: Grants a chance to dodge incoming attacks (capped by configuration).
+*   **`SPEED`**: Affects base movement speed up to a configurable cap.
+*   **`MAGIC_FIND`** and **`PET_LUCK`**: Modify loot rolls for rare items or pets.
+*   **Gathering stats** such as **`MINING_SPEED`**, **`MINING_FORTUNE`**, **`FARMING_FORTUNE`**, **`FORAGING_FORTUNE`**, and **`FISHING_FORTUNE`** increase efficiency and yields in their respective professions.
 
-Each `Stat` enum constant also includes a user-friendly display name (e.g., "Strength") and a description.
+Each `Stat` enum constant includes a display name and description to help surface its intent in-game.
 
 ---
 
@@ -74,29 +81,14 @@ The calculation logic resides within the `PlayerProfile` class, specifically in 
 
 **Key Derived Attributes:**
 
-*   **`maxHealth`**: Maximum Health Points.
-    *   Formula: `BaseHealth + (Vitality * HP_per_Vitality) + (Level * HP_per_Level)`
-    *   Example: `50 + (VITALITY * 5.0) + (level * 2.0)`
-*   **`maxMana`**: Maximum Mana Points.
-    *   Formula: `BaseMana + (Wisdom * MP_per_Wisdom) + (Level * MP_per_Level)`
-    *   Example: `20 + (WISDOM * 3.0) + (level * 1.0)`
-*   **`criticalHitChance`**: Chance to land a critical hit.
-    *   Formula: `BaseCritChance + (Agility * Crit_per_Agility) + (Luck * Crit_per_Luck)`
-    *   Example: `0.05 + (AGILITY * 0.005) + (LUCK * 0.002)` (Result clamped between 0.0 and 1.0)
-*   **`criticalDamageBonus`**: Multiplier for damage dealt on a critical hit (e.g., 1.5 means +50% damage).
-    *   Formula: `BaseCritDmgBonus + (Strength * CritDmg_per_Strength)`
-    *   Example: `1.5 + (STRENGTH * 0.01)`
-*   **`evasionChance`**: Chance to evade an incoming attack.
-    *   Formula: `BaseEvasionChance + (Agility * Evasion_per_Agility) + (Luck * Evasion_per_Luck)`
-    *   Example: `0.02 + (AGILITY * 0.004) + (LUCK * 0.001)` (Result clamped, e.g., max 0.95)
-*   **`physicalDamageReduction`**: Percentage reduction of incoming physical damage.
-    *   Formula: `(Defense * Reduction_per_Defense)` (capped)
-    *   Example: `DEFENSE * 0.005` (Result clamped, e.g., max 0.80 for 80%)
-*   **`magicDamageReduction`**: Percentage reduction of incoming magical damage.
-    *   Formula: `(Wisdom * Reduction_per_Wisdom)` (capped, using Wisdom as an example)
-    *   Example: `WISDOM * 0.003` (Result clamped, e.g., max 0.80 for 80%)
+*   **`maxHealth`**: Directly sourced from the scaled `HEALTH` stat.
+*   **`maxMana`**: Equal to the scaled `INTELLIGENCE` stat.
+*   **`criticalHitChance`**: Converts the `CRITICAL_CHANCE` stat into a 0–1 fraction (capped at 100%).
+*   **`criticalDamageBonus`**: Converts `CRITICAL_DAMAGE` into a multiplicative bonus (`1 + critDamage%/100`).
+*   **`evasionChance`**: Based on the `EVASION` stat and capped by configuration.
+*   **`physicalDamageReduction` / `magicDamageReduction`**: Calculated via configurable diminishing returns using both `DEFENSE` and `TRUE_DEFENSE`.
 
-After these attributes are recalculated, `currentHealth` and `currentMana` are clamped to ensure they do not exceed the new maximums. The specific base values and per-stat-point factors (e.g., `HP_per_Vitality`) are defined as constants within `PlayerProfile`. These could be made configurable in the future via `ConfigService`.
+The specific scaling factors, caps, and diminishing returns behaviour come from `StatScalingConfig` (loaded via `stats.yml`). After derived attributes are recalculated, `currentHealth` and `currentMana` are clamped so they never exceed the newly computed maximums.
 
 This system ensures that player stats are always up-to-date and reflect changes in core stats or level immediately.
 

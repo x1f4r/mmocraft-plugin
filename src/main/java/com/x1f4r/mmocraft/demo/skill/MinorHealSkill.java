@@ -21,13 +21,13 @@ import org.bukkit.entity.Player;
 public class MinorHealSkill extends Skill {
 
     private static final double BASE_HEAL_AMOUNT = 10.0;
-    private static final double WISDOM_SCALING_FACTOR = 0.8;
+    private static final double INTELLIGENCE_SCALING_FACTOR = 0.8;
 
     public MinorHealSkill(MMOCraftPlugin plugin) {
         super(plugin,
                 "minor_heal",
                 "Minor Heal",
-                "Heals yourself for a small amount based on Wisdom.",
+                "Heals yourself for a small amount based on Intelligence and Ability Power.",
                 15.0,
                 8.0,
                 0.5,
@@ -48,7 +48,9 @@ public class MinorHealSkill extends Skill {
             return;
         }
 
-        double healAmount = Math.max(0, BASE_HEAL_AMOUNT + (casterProfile.getStatValue(Stat.WISDOM) * WISDOM_SCALING_FACTOR));
+        double abilityPowerMultiplier = 1.0 + (casterProfile.getStatValue(Stat.ABILITY_POWER) / 100.0);
+        double healAmount = Math.max(0, (BASE_HEAL_AMOUNT +
+                (casterProfile.getStatValue(Stat.INTELLIGENCE) * INTELLIGENCE_SCALING_FACTOR)) * abilityPowerMultiplier);
         long previousHealth = casterProfile.getCurrentHealth();
         long newHealth = Math.min(casterProfile.getMaxHealth(), previousHealth + Math.round(healAmount));
         casterProfile.setCurrentHealth(newHealth);

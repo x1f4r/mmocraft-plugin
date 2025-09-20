@@ -120,26 +120,7 @@ public class GameplayConfigService {
         StatScalingConfig defaults = StatScalingConfig.defaults();
         StatScalingConfig.Builder builder = StatScalingConfig.builder(defaults);
 
-        builder.baseHealth(yaml.getLong("derived.base-health", defaults.getBaseHealth()));
-        builder.healthPerVitality(yaml.getDouble("derived.health-per-vitality", defaults.getHealthPerVitality()));
-        builder.healthPerLevel(yaml.getDouble("derived.health-per-level", defaults.getHealthPerLevel()));
-        builder.baseMana(yaml.getLong("derived.base-mana", defaults.getBaseMana()));
-        builder.manaPerWisdom(yaml.getDouble("derived.mana-per-wisdom", defaults.getManaPerWisdom()));
-        builder.manaPerLevel(yaml.getDouble("derived.mana-per-level", defaults.getManaPerLevel()));
-        builder.baseCriticalHitChance(yaml.getDouble("derived.base-critical-hit-chance", defaults.getBaseCriticalHitChance()));
-        builder.critChancePerAgility(yaml.getDouble("derived.crit-chance-per-agility", defaults.getCritChancePerAgility()));
-        builder.critChancePerLuck(yaml.getDouble("derived.crit-chance-per-luck", defaults.getCritChancePerLuck()));
-        builder.baseCriticalDamageBonus(yaml.getDouble("derived.base-critical-damage-bonus", defaults.getBaseCriticalDamageBonus()));
-        builder.critDamageBonusPerStrength(yaml.getDouble("derived.crit-damage-bonus-per-strength", defaults.getCritDamageBonusPerStrength()));
-        builder.baseEvasionChance(yaml.getDouble("derived.base-evasion-chance", defaults.getBaseEvasionChance()));
-        builder.evasionPerAgility(yaml.getDouble("derived.evasion-per-agility", defaults.getEvasionPerAgility()));
-        builder.evasionPerLuck(yaml.getDouble("derived.evasion-per-luck", defaults.getEvasionPerLuck()));
-        builder.physReductionPerDefense(yaml.getDouble("derived.phys-reduction-per-defense", defaults.getPhysReductionPerDefense()));
-        builder.maxPhysReduction(yaml.getDouble("derived.max-phys-reduction", defaults.getMaxPhysReduction()));
-        builder.magicReductionPerWisdom(yaml.getDouble("derived.magic-reduction-per-wisdom", defaults.getMagicReductionPerWisdom()));
-        builder.maxMagicReduction(yaml.getDouble("derived.max-magic-reduction", defaults.getMaxMagicReduction()));
-
-        builder.defaultStatBaseValue(yaml.getDouble("defaults.base-stat", defaults.getDefaultStatBaseValue()));
+        builder.defaultStatInvestment(yaml.getDouble("defaults.base-investment", defaults.getDefaultStatInvestment()));
         ConfigurationSection overrides = yaml.getConfigurationSection("defaults.overrides");
         if (overrides != null) {
             Map<Stat, Double> overrideMap = new EnumMap<>(Stat.class);
@@ -153,7 +134,79 @@ public class GameplayConfigService {
             }
             builder.overrides(overrideMap);
         }
+
+        ConfigurationSection scalingSection = yaml.getConfigurationSection("scaling");
+        if (scalingSection != null) {
+            for (String key : scalingSection.getKeys(false)) {
+                try {
+                    Stat stat = Stat.valueOf(key.toUpperCase(Locale.ROOT));
+                    ConfigurationSection statSection = scalingSection.getConfigurationSection(key);
+                    if (statSection != null) {
+                        StatScalingConfig.StatRule baseRule = defaults.getStatRule(stat);
+                        StatScalingConfig.StatRule parsed = parseStatRule(statSection, baseRule);
+                        builder.statRule(stat, parsed);
+                    }
+                } catch (IllegalArgumentException ex) {
+                    issues.add(GameplayConfigIssue.warn("Unknown stat entry in stats.yml scaling section", key));
+                }
+            }
+        }
+
+        builder.defenseReductionBase(yaml.getDouble("combat.defense-reduction-base", defaults.getDefenseReductionBase()));
+        builder.trueDefenseReductionBase(yaml.getDouble("combat.true-defense-reduction-base", defaults.getTrueDefenseReductionBase()));
+        builder.maxDamageReduction(yaml.getDouble("combat.max-damage-reduction", defaults.getMaxDamageReduction()));
+        builder.maxEvasionChance(yaml.getDouble("combat.max-evasion-chance", defaults.getMaxEvasionChance()));
+
         return builder.build();
+    }
+
+    private StatScalingConfig.StatRule parseStatRule(ConfigurationSection section, StatScalingConfig.StatRule defaults) {
+        StatScalingConfig.StatRule.Builder ruleBuilder = defaults == null
+                ? StatScalingConfig.StatRule.builder()
+                : defaults.toBuilder();
+
+        StatScalingConfig.StatRule template = defaults != null ? defaults : ruleBuilder.build();
+        double defaultBase = template.getBaseValue();
+        double defaultPerPoint = template.getPerPoint();
+        double defaultPerLevel = template.getPerLevel();
+        double defaultMin = template.getMinValue();
+        Double defaultMax = template.getMaxValue();
+
+        if (section.contains("base")) {
+            ruleBuilder.baseValue(section.getDouble("base", defaultBase));
+        }
+        if (section.contains("per-point")) {
+            ruleBuilder.perPoint(section.getDouble("per-point", defaultPerPoint));
+        }
+        if (section.contains("per-level")) {
+            ruleBuilder.perLevel(section.getDouble("per-level", defaultPerLevel));
+        }
+        if (section.contains("min")) {
+            ruleBuilder.minValue(section.getDouble("min", defaultMin));
+        }
+        if (section.contains("max")) {
+            Object maxObj = section.get("max");
+            if (maxObj == null) {
+                ruleBuilder.maxValue(null);
+            } else {
+                ruleBuilder.maxValue(section.getDouble("max", defaultMax != null ? defaultMax : 0.0));
+            }
+        }
+
+        if (section.isConfigurationSection("diminishing")) {
+            ConfigurationSection dim = section.getConfigurationSection("diminishing");
+            double threshold = dim.getDouble("threshold",
+                    defaults != null && defaults.getDiminishingReturns() != null
+                            ? defaults.getDiminishingReturns().threshold()
+                            : Double.MAX_VALUE);
+            double multiplier = dim.getDouble("multiplier",
+                    defaults != null && defaults.getDiminishingReturns() != null
+                            ? defaults.getDiminishingReturns().multiplier()
+                            : 1.0);
+            ruleBuilder.diminishingReturns(new StatScalingConfig.DiminishingReturns(threshold, multiplier));
+        }
+
+        return ruleBuilder.build();
     }
 
     private LootTablesConfig loadLootTablesConfig() {
