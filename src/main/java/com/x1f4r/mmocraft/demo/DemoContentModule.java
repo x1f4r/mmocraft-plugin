@@ -1,5 +1,6 @@
 package com.x1f4r.mmocraft.demo;
 
+import com.x1f4r.mmocraft.config.gameplay.DemoContentConfig;
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.demo.item.SimpleSword;
 import com.x1f4r.mmocraft.demo.item.TrainingArmor;
@@ -9,11 +10,11 @@ import com.x1f4r.mmocraft.item.model.CustomItem;
 import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
 import com.x1f4r.mmocraft.loot.model.LootTable;
 import com.x1f4r.mmocraft.loot.model.LootTableEntry;
-import com.x1f4r.mmocraft.loot.model.LootType;
 import com.x1f4r.mmocraft.loot.service.LootService;
 import com.x1f4r.mmocraft.skill.model.Skill;
 import com.x1f4r.mmocraft.skill.service.SkillRegistryService;
 import com.x1f4r.mmocraft.util.LoggingUtil;
+import com.x1f4r.mmocraft.util.StringUtil;
 import com.x1f4r.mmocraft.world.resourcegathering.model.ResourceNodeType;
 import com.x1f4r.mmocraft.world.resourcegathering.service.ActiveNodeManager;
 import com.x1f4r.mmocraft.world.resourcegathering.service.ResourceNodeRegistryService;
@@ -24,17 +25,17 @@ import com.x1f4r.mmocraft.world.spawning.model.CustomSpawnRule;
 import com.x1f4r.mmocraft.world.spawning.model.MobSpawnDefinition;
 import com.x1f4r.mmocraft.world.spawning.service.CustomSpawningService;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
 import org.bukkit.entity.EntityType;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -46,22 +47,9 @@ import java.util.Set;
  */
 public final class DemoContentModule {
 
-    private static final String ZOMBIE_LOOT_TABLE_ID = "zombie_common_drops";
-    private static final String WARRIOR_LOOT_TABLE_ID = "warrior_common_loot";
-    private static final String STONE_NODE_TYPE_ID = "stone_node";
-    private static final String IRON_NODE_TYPE_ID = "iron_ore_node";
-    private static final String STONE_NODE_LOOT_ID = "stone_node_loot";
-    private static final String IRON_NODE_LOOT_ID = "iron_ore_node_loot";
-    private static final String SKELETAL_WARRIOR_RULE_ID = "plains_skeletal_warriors_night";
-
-    private static final List<ResourceNodePlacement> DEFAULT_NODE_PLACEMENTS = List.of(
-            new ResourceNodePlacement(STONE_NODE_TYPE_ID, 10, 60, 10),
-            new ResourceNodePlacement(STONE_NODE_TYPE_ID, 12, 60, 10),
-            new ResourceNodePlacement(IRON_NODE_TYPE_ID, 10, 60, 12)
-    );
-
     private final MMOCraftPlugin plugin;
     private final LoggingUtil logger;
+    private DemoContentConfig demoConfig;
     private DemoContentSettings currentSettings = DemoContentSettings.disabled();
     private final Set<String> registeredItemIds = new HashSet<>();
     private final Set<String> registeredSkillIds = new HashSet<>();
@@ -70,9 +58,20 @@ public final class DemoContentModule {
     private final Map<EntityType, String> registeredMobLootTableIds = new EnumMap<>(EntityType.class);
     private final Set<String> registeredSpawnRuleIds = new HashSet<>();
 
-    public DemoContentModule(MMOCraftPlugin plugin, LoggingUtil logger) {
+    public DemoContentModule(MMOCraftPlugin plugin, LoggingUtil logger, DemoContentConfig demoConfig) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.logger = Objects.requireNonNull(logger, "logger");
+        this.demoConfig = demoConfig != null ? demoConfig : DemoContentConfig.defaults();
+    }
+
+    public synchronized void updateConfig(DemoContentConfig newConfig) {
+        this.demoConfig = newConfig != null ? newConfig : DemoContentConfig.defaults();
+        if (currentSettings.masterEnabled()) {
+            DemoContentSettings snapshot = currentSettings;
+            unloadDemoContent();
+            currentSettings = DemoContentSettings.disabled();
+            applySettings(snapshot);
+        }
     }
 
     public synchronized void applySettings(DemoContentSettings newSettings) {
@@ -166,30 +165,37 @@ public final class DemoContentModule {
             return;
         }
 
-        if (lootService.getLootTable(EntityType.ZOMBIE).isEmpty()) {
-            LootTable zombieLootTable = new LootTable(ZOMBIE_LOOT_TABLE_ID,
-                    List.of(new LootTableEntry("simple_sword", 0.05, 1, 1)));
-            lootService.registerLootTable(EntityType.ZOMBIE, zombieLootTable);
-            registeredMobLootTableIds.put(EntityType.ZOMBIE, ZOMBIE_LOOT_TABLE_ID);
-        } else {
-            logger.debug("Zombie loot table already present. Demo loot will not override existing configuration.");
+        for (DemoContentConfig.MobLootTableDefinition mobTable : demoConfig.getMobLootTables()) {
+            EntityType entityType = mobTable.entityType();
+            if (lootService.getLootTable(entityType).isPresent()) {
+                logger.debug("Loot table for '" + entityType.name() + "' already exists. Skipping demo registration.");
+                continue;
+            }
+            lootService.registerLootTable(entityType, toLootTable(mobTable.table()));
+            registeredMobLootTableIds.put(entityType, mobTable.table().tableId());
         }
 
-        registerGenericLootTableIfAbsent(lootService, STONE_NODE_LOOT_ID,
-                List.of(new LootTableEntry(LootType.VANILLA, "COBBLESTONE", 1.0, 1, 1)));
-        registerGenericLootTableIfAbsent(lootService, IRON_NODE_LOOT_ID,
-                List.of(new LootTableEntry(LootType.VANILLA, "RAW_IRON", 1.0, 1, 1)));
-        registerGenericLootTableIfAbsent(lootService, WARRIOR_LOOT_TABLE_ID,
-                List.of(new LootTableEntry("simple_sword", 0.25, 1, 1)));
+        for (DemoContentConfig.LootTableDefinition tableDefinition : demoConfig.getGenericLootTables()) {
+            registerGenericLootTableIfAbsent(lootService, tableDefinition);
+        }
     }
 
-    private void registerGenericLootTableIfAbsent(LootService lootService, String lootTableId, List<LootTableEntry> entries) {
+    private void registerGenericLootTableIfAbsent(LootService lootService, DemoContentConfig.LootTableDefinition definition) {
+        String lootTableId = definition.tableId();
         if (lootService.getLootTableById(lootTableId).isPresent()) {
             logger.debug("Loot table '" + lootTableId + "' already exists. Skipping demo registration.");
             return;
         }
-        lootService.registerLootTableById(new LootTable(lootTableId, entries));
+        lootService.registerLootTableById(toLootTable(definition));
         registeredGenericLootTableIds.add(lootTableId);
+    }
+
+    private LootTable toLootTable(DemoContentConfig.LootTableDefinition definition) {
+        List<LootTableEntry> entries = new ArrayList<>();
+        for (DemoContentConfig.LootEntryDefinition entry : definition.entries()) {
+            entries.add(new LootTableEntry(entry.type(), entry.identifier(), entry.chance(), entry.minAmount(), entry.maxAmount()));
+        }
+        return new LootTable(definition.tableId(), entries);
     }
 
     private void registerDemoCustomSpawns() {
@@ -198,38 +204,49 @@ public final class DemoContentModule {
             logger.severe("CustomSpawningService not initialized. Demo custom spawns cannot be registered.");
             return;
         }
-        boolean alreadyRegistered = spawningService.getAllRules().stream()
-                .anyMatch(rule -> rule.getRuleId().equals(SKELETAL_WARRIOR_RULE_ID));
-        if (alreadyRegistered) {
-            logger.debug("Demo spawn rule '" + SKELETAL_WARRIOR_RULE_ID + "' already registered. Skipping.");
-            return;
+        for (DemoContentConfig.CustomSpawnRuleConfig spawnConfig : demoConfig.getCustomSpawnRules()) {
+            boolean alreadyRegistered = spawningService.getAllRules().stream()
+                    .anyMatch(rule -> rule.getRuleId().equals(spawnConfig.ruleId()));
+            if (alreadyRegistered) {
+                logger.debug("Demo spawn rule '" + spawnConfig.ruleId() + "' already registered. Skipping.");
+                continue;
+            }
+            MobSpawnDefinition definition = buildMobSpawnDefinition(spawnConfig);
+            List<SpawnCondition> conditions = buildSpawnConditions(spawnConfig);
+            CustomSpawnRule rule = new CustomSpawnRule(
+                    spawnConfig.ruleId(),
+                    definition,
+                    conditions,
+                    spawnConfig.spawnChance(),
+                    spawnConfig.minY(),
+                    spawnConfig.maxY(),
+                    spawnConfig.maxNearby(),
+                    spawnConfig.radius(),
+                    spawnConfig.intervalTicks()
+            );
+            spawningService.registerRule(rule);
+            registeredSpawnRuleIds.add(rule.getRuleId());
         }
+    }
 
-        MobSpawnDefinition skeletalWarriorDef = new MobSpawnDefinition(
-                "skeletal_warrior",
-                EntityType.SKELETON,
-                ChatColor.RED + "Skeletal Warrior",
-                "skeletal_warrior_stats",
-                WARRIOR_LOOT_TABLE_ID,
-                Map.of(EquipmentSlot.HAND, new ItemStack(Material.IRON_SWORD))
-        );
-        List<SpawnCondition> conditions = List.of(
-                new BiomeCondition(Set.of(Biome.PLAINS, Biome.MEADOW, Biome.SAVANNA)),
-                new TimeCondition(13000, 23000)
-        );
-        CustomSpawnRule warriorRule = new CustomSpawnRule(
-                SKELETAL_WARRIOR_RULE_ID,
-                skeletalWarriorDef,
-                conditions,
-                0.1,
-                60,
-                200,
-                5,
-                16.0,
-                200
-        );
-        spawningService.registerRule(warriorRule);
-        registeredSpawnRuleIds.add(warriorRule.getRuleId());
+    private MobSpawnDefinition buildMobSpawnDefinition(DemoContentConfig.CustomSpawnRuleConfig spawnConfig) {
+        Map<EquipmentSlot, ItemStack> equipment = new EnumMap<>(EquipmentSlot.class);
+        spawnConfig.equipment().forEach((slot, material) -> equipment.put(slot, new ItemStack(material)));
+        String displayName = spawnConfig.displayName() != null ? StringUtil.colorize(spawnConfig.displayName()) : null;
+        return new MobSpawnDefinition(spawnConfig.mobId(), spawnConfig.entityType(), displayName,
+                spawnConfig.statProfileId(), spawnConfig.lootTableId(), equipment);
+    }
+
+    private List<SpawnCondition> buildSpawnConditions(DemoContentConfig.CustomSpawnRuleConfig spawnConfig) {
+        List<SpawnCondition> conditions = new ArrayList<>();
+        if (!spawnConfig.biomes().isEmpty()) {
+            conditions.add(new BiomeCondition(spawnConfig.biomes()));
+        }
+        DemoContentConfig.TimeWindow window = spawnConfig.timeWindow();
+        if (window != null) {
+            conditions.add(new TimeCondition(window.start(), window.end()));
+        }
+        return conditions;
     }
 
     private void registerDemoResourceNodeTypes() {
@@ -240,35 +257,25 @@ public final class DemoContentModule {
             return;
         }
 
-        registerResourceNodeTypeIfAbsent(registryService, lootService,
-                STONE_NODE_TYPE_ID,
-                new ResourceNodeType(STONE_NODE_TYPE_ID, Material.STONE, 5.0,
-                        Set.of(Material.WOODEN_PICKAXE, Material.STONE_PICKAXE, Material.IRON_PICKAXE,
-                                Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE),
-                        STONE_NODE_LOOT_ID,
-                        60,
-                        "&7Stone Deposit"));
-
-        registerResourceNodeTypeIfAbsent(registryService, lootService,
-                IRON_NODE_TYPE_ID,
-                new ResourceNodeType(IRON_NODE_TYPE_ID, Material.IRON_ORE, 10.0,
-                        Set.of(Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE,
-                                Material.NETHERITE_PICKAXE),
-                        IRON_NODE_LOOT_ID,
-                        180,
-                        "&fIron Vein"));
+        for (DemoContentConfig.ResourceNodeTypeConfig typeConfig : demoConfig.getResourceNodeTypes()) {
+            registerResourceNodeTypeIfAbsent(registryService, lootService, typeConfig);
+        }
     }
 
     private void registerResourceNodeTypeIfAbsent(ResourceNodeRegistryService registryService, LootService lootService,
-                                                  String typeId, ResourceNodeType nodeType) {
+                                                  DemoContentConfig.ResourceNodeTypeConfig typeConfig) {
+        String typeId = typeConfig.typeId();
         if (registryService.getNodeType(typeId).isPresent()) {
             logger.debug("Resource node type '" + typeId + "' already registered. Skipping demo registration.");
             return;
         }
-        if (lootService.getLootTableById(nodeType.getLootTableId()).isEmpty()) {
-            logger.warning("Required loot table '" + nodeType.getLootTableId() + "' missing for node type '" + typeId + "'.");
+        if (lootService.getLootTableById(typeConfig.lootTableId()).isEmpty()) {
+            logger.warning("Required loot table '" + typeConfig.lootTableId() + "' missing for node type '" + typeId + "'.");
             return;
         }
+        ResourceNodeType nodeType = new ResourceNodeType(typeConfig.typeId(), typeConfig.blockMaterial(),
+                typeConfig.harvestSeconds(), typeConfig.requiredTools(), typeConfig.lootTableId(),
+                typeConfig.respawnSeconds(), typeConfig.displayName());
         registryService.registerNodeType(nodeType);
         registeredResourceNodeTypeIds.add(typeId);
     }
@@ -279,14 +286,14 @@ public final class DemoContentModule {
             logger.severe("ActiveNodeManager not initialized. Demo nodes cannot be placed.");
             return;
         }
-        Optional<World> worldOpt = resolveDefaultWorld();
-        if (worldOpt.isEmpty()) {
-            logger.warning("No worlds available to place demo resource nodes.");
-            return;
-        }
-        World world = worldOpt.get();
+        Optional<World> defaultWorld = resolveDefaultWorld();
         int placed = 0;
-        for (ResourceNodePlacement placement : DEFAULT_NODE_PLACEMENTS) {
+        Set<String> populatedWorlds = new LinkedHashSet<>();
+        for (DemoContentConfig.ResourceNodePlacementConfig placement : demoConfig.getResourceNodePlacements()) {
+            World world = resolvePlacementWorld(placement, defaultWorld);
+            if (world == null) {
+                continue;
+            }
             Location location = new Location(world, placement.x(), placement.y(), placement.z());
             if (nodeManager.getActiveNode(location).isPresent()) {
                 logger.debug("Resource node already present at " + location + ". Skipping placement.");
@@ -299,10 +306,34 @@ public final class DemoContentModule {
             }
             nodeManager.placeNewNode(location, placement.nodeTypeId());
             placed++;
+            if (world.getName() != null) {
+                populatedWorlds.add(world.getName());
+            }
         }
         if (placed > 0) {
-            logger.info("Placed " + placed + " demo resource nodes in world '" + world.getName() + "'.");
+            if (populatedWorlds.isEmpty()) {
+                logger.info("Placed " + placed + " demo resource nodes.");
+            } else if (populatedWorlds.size() == 1) {
+                logger.info("Placed " + placed + " demo resource nodes in world '" + populatedWorlds.iterator().next() + "'.");
+            } else {
+                logger.info("Placed " + placed + " demo resource nodes across worlds: " + String.join(", ", populatedWorlds) + ".");
+            }
         }
+    }
+
+    private World resolvePlacementWorld(DemoContentConfig.ResourceNodePlacementConfig placement, Optional<World> defaultWorld) {
+        if (placement.world() != null && !placement.world().isBlank()) {
+            World world = Bukkit.getWorld(placement.world());
+            if (world == null) {
+                logger.warning("World '" + placement.world() + "' not found for demo resource node placement.");
+            }
+            return world;
+        }
+        if (defaultWorld.isEmpty()) {
+            logger.warning("No default world available to place demo resource node '" + placement.nodeTypeId() + "'.");
+            return null;
+        }
+        return defaultWorld.get();
     }
 
     private Optional<World> resolveDefaultWorld() {
@@ -402,8 +433,5 @@ public final class DemoContentModule {
             }
         }
         registeredResourceNodeTypeIds.clear();
-    }
-
-    private record ResourceNodePlacement(String nodeTypeId, int x, int y, int z) {
     }
 }

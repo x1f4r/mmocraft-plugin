@@ -1,5 +1,6 @@
 package com.x1f4r.mmocraft.playerdata.model;
 
+import com.x1f4r.mmocraft.config.gameplay.StatScalingConfig;
 import com.x1f4r.mmocraft.playerdata.util.ExperienceUtil;
 import java.time.LocalDateTime;
 import java.util.EnumMap;
@@ -50,32 +51,15 @@ public class PlayerProfile {
     private double physicalDamageReduction; // Percentage, e.g., 0.1 for 10%
     private double magicDamageReduction;    // Percentage
 
-    // --- Constants for Derived Stat Calculation ---
-    // Max Health
-    private static final long BASE_HEALTH = 50;
-    private static final double HEALTH_PER_VITALITY = 5.0;
-    private static final double HEALTH_PER_LEVEL = 2.0;
-    // Max Mana
-    private static final long BASE_MANA = 20;
-    private static final double MANA_PER_WISDOM = 3.0;
-    private static final double MANA_PER_LEVEL = 1.0;
-    // Critical Hit Chance
-    private static final double BASE_CRITICAL_HIT_CHANCE = 0.05; // 5%
-    private static final double CRIT_CHANCE_PER_AGILITY = 0.005; // 0.5% per Agility point
-    private static final double CRIT_CHANCE_PER_LUCK = 0.002;    // 0.2% per Luck point
-    // Critical Damage Bonus
-    private static final double BASE_CRITICAL_DAMAGE_BONUS = 1.5; // 150% total damage (i.e., +50% bonus)
-    private static final double CRIT_DAMAGE_BONUS_PER_STRENGTH = 0.01; // +1% bonus damage per Strength
-    // Evasion Chance
-    private static final double BASE_EVASION_CHANCE = 0.02; // 2%
-    private static final double EVASION_PER_AGILITY = 0.004; // 0.4% per Agility
-    private static final double EVASION_PER_LUCK = 0.001;    // 0.1% per Luck
-    // Physical Damage Reduction (example: 0.5% per point of Defense, capped for safety)
-    private static final double PHYS_REDUCTION_PER_DEFENSE = 0.005; // 0.5%
-    private static final double MAX_PHYS_REDUCTION = 0.80; // 80% cap
-    // Magic Damage Reduction (example: 0.3% per point of Wisdom, capped)
-    private static final double MAGIC_REDUCTION_PER_WISDOM = 0.003; // 0.3%
-    private static final double MAX_MAGIC_REDUCTION = 0.80; // 80% cap
+    private static volatile StatScalingConfig statScalingConfig = StatScalingConfig.defaults();
+
+    public static void setStatScalingConfig(StatScalingConfig config) {
+        statScalingConfig = config == null ? StatScalingConfig.defaults() : config;
+    }
+
+    private static StatScalingConfig getStatScalingConfig() {
+        return statScalingConfig;
+    }
 
 
     // For future expansion, e.g., storing skill levels, quest progress, etc.
@@ -97,13 +81,10 @@ public class PlayerProfile {
         this.currency = 0;
 
         this.coreStats = new EnumMap<>(Stat.class);
-        // Initialize with base values for each stat (these can also be constants or configurable)
+        StatScalingConfig config = getStatScalingConfig();
         for (Stat stat : Stat.values()) {
-            this.coreStats.put(stat, 10.0); // Default starting value for all core stats
+            this.coreStats.put(stat, config.getDefaultStatValue(stat));
         }
-        // Example: Make Vitality and Wisdom slightly higher by default if desired
-        this.coreStats.put(Stat.VITALITY, 12.0);
-        this.coreStats.put(Stat.WISDOM, 11.0);
 
         LocalDateTime now = LocalDateTime.now();
         this.firstLogin = now;
@@ -265,45 +246,39 @@ public class PlayerProfile {
      * or the player's level changes, or when the profile is loaded.
      */
     public void recalculateDerivedAttributes() {
-        // Max Health Calculation
-        this.maxHealth = (long) (BASE_HEALTH +
-                                (getStatValue(Stat.VITALITY) * HEALTH_PER_VITALITY) +
-                                (this.level * HEALTH_PER_LEVEL));
-        this.maxHealth = Math.max(1, this.maxHealth); // Ensure maxHealth is at least 1
-        this.currentHealth = Math.min(this.currentHealth, this.maxHealth); // Clamp current health
+        StatScalingConfig config = getStatScalingConfig();
 
-        // Max Mana Calculation
-        this.maxMana = (long) (BASE_MANA +
-                               (getStatValue(Stat.WISDOM) * MANA_PER_WISDOM) +
-                               (this.level * MANA_PER_LEVEL));
-        this.maxMana = Math.max(0, this.maxMana); // Max mana can be 0
-        this.currentMana = Math.min(this.currentMana, this.maxMana); // Clamp current mana
+        double computedMaxHealth = config.getBaseHealth()
+                + (getStatValue(Stat.VITALITY) * config.getHealthPerVitality())
+                + (this.level * config.getHealthPerLevel());
+        this.maxHealth = Math.max(1L, Math.round(computedMaxHealth));
+        this.currentHealth = Math.min(this.currentHealth, this.maxHealth);
 
-        // Critical Hit Chance Calculation
-        double critChance = BASE_CRITICAL_HIT_CHANCE +
-                            (getStatValue(Stat.AGILITY) * CRIT_CHANCE_PER_AGILITY) +
-                            (getStatValue(Stat.LUCK) * CRIT_CHANCE_PER_LUCK);
-        this.criticalHitChance = Math.max(0.0, Math.min(critChance, 1.0)); // Clamp between 0.0 (0%) and 1.0 (100%)
+        double computedMaxMana = config.getBaseMana()
+                + (getStatValue(Stat.WISDOM) * config.getManaPerWisdom())
+                + (this.level * config.getManaPerLevel());
+        this.maxMana = Math.max(0L, Math.round(computedMaxMana));
+        this.currentMana = Math.min(this.currentMana, this.maxMana);
 
-        // Critical Damage Bonus Calculation
-        this.criticalDamageBonus = BASE_CRITICAL_DAMAGE_BONUS +
-                                   (getStatValue(Stat.STRENGTH) * CRIT_DAMAGE_BONUS_PER_STRENGTH);
-        this.criticalDamageBonus = Math.max(1.0, this.criticalDamageBonus); // Min 100% (no negative bonus)
+        double critChance = config.getBaseCriticalHitChance()
+                + (getStatValue(Stat.AGILITY) * config.getCritChancePerAgility())
+                + (getStatValue(Stat.LUCK) * config.getCritChancePerLuck());
+        this.criticalHitChance = Math.max(0.0, Math.min(critChance, 1.0));
 
+        double critDamage = config.getBaseCriticalDamageBonus()
+                + (getStatValue(Stat.STRENGTH) * config.getCritDamageBonusPerStrength());
+        this.criticalDamageBonus = Math.max(1.0, critDamage);
 
-        // Evasion Chance Calculation
-        double evasion = BASE_EVASION_CHANCE +
-                         (getStatValue(Stat.AGILITY) * EVASION_PER_AGILITY) +
-                         (getStatValue(Stat.LUCK) * EVASION_PER_LUCK);
-        this.evasionChance = Math.max(0.0, Math.min(evasion, 0.95)); // Clamp, max 95% evasion
+        double evasion = config.getBaseEvasionChance()
+                + (getStatValue(Stat.AGILITY) * config.getEvasionPerAgility())
+                + (getStatValue(Stat.LUCK) * config.getEvasionPerLuck());
+        this.evasionChance = Math.max(0.0, Math.min(evasion, 0.95));
 
-        // Physical Damage Reduction (simple linear, capped)
-        double physReduction = getStatValue(Stat.DEFENSE) * PHYS_REDUCTION_PER_DEFENSE;
-        this.physicalDamageReduction = Math.max(0.0, Math.min(physReduction, MAX_PHYS_REDUCTION));
+        double physReduction = getStatValue(Stat.DEFENSE) * config.getPhysReductionPerDefense();
+        this.physicalDamageReduction = Math.max(0.0, Math.min(physReduction, config.getMaxPhysReduction()));
 
-        // Magic Damage Reduction (simple linear, capped)
-        double magicRed = getStatValue(Stat.WISDOM) * MAGIC_REDUCTION_PER_WISDOM; // Example: Wisdom for magic def
-        this.magicDamageReduction = Math.max(0.0, Math.min(magicRed, MAX_MAGIC_REDUCTION));
+        double magicRed = getStatValue(Stat.WISDOM) * config.getMagicReductionPerWisdom();
+        this.magicDamageReduction = Math.max(0.0, Math.min(magicRed, config.getMaxMagicReduction()));
     }
 
 

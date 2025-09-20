@@ -1,0 +1,27 @@
+# ------------------------------------------------------------
+# Custom crafting recipes
+# ------------------------------------------------------------
+# Recipes are disabled by default to preserve current behaviour.
+# Flip "enabled" to true and reload to activate them.
+# ------------------------------------------------------------
+
+[[recipes]]
+id = "simple_sword_repair"
+enabled = false
+type = "CUSTOM_SHAPELESS"
+permission = ""
+
+[recipes.output]
+type = "CUSTOM"
+id = "simple_sword"
+amount = 1
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "IRON_INGOT"
+quantity = 2
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "STICK"
+quantity = 1

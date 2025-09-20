@@ -25,6 +25,7 @@ public class MMOCAdminRootCommand extends AbstractPluginCommand {
         registerSubCommand("resource", new ResourceAdminCommand(plugin, "mmocadm resource", "mmocraft.admin.resource"));
         registerSubCommand("demo", new DemoAdminCommand(plugin));
         registerSubCommand("diagnostics", new DiagnosticsAdminCommand(plugin));
+        registerSubCommand("reloadconfig", new ReloadConfigAdminCommand(plugin));
         // Example: registerSubCommand("config", new ConfigAdminCommand(plugin));
     }
 
@@ -43,6 +44,9 @@ public class MMOCAdminRootCommand extends AbstractPluginCommand {
         }
         if (sender.hasPermission("mmocraft.admin.diagnostics")) {
             sender.sendMessage(StringUtil.colorize("&e/mmocadm diagnostics &7- Run plugin health checks and log issues."));
+        }
+        if (sender.hasPermission("mmocraft.admin.reload")) {
+            sender.sendMessage(StringUtil.colorize("&e/mmocadm reloadconfig &7- Reload gameplay configuration files."));
         }
 
         // Check if the sender has permission for any registered subcommand to avoid "No admin modules available"

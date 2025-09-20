@@ -1,6 +1,8 @@
 package com.x1f4r.mmocraft.diagnostics;
 
-import com.x1f4r.mmocraft.config.ConfigService;
+import com.x1f4r.mmocraft.config.gameplay.GameplayConfigIssue;
+import com.x1f4r.mmocraft.config.gameplay.GameplayConfigService;
+import com.x1f4r.mmocraft.config.gameplay.StatScalingConfig;
 import com.x1f4r.mmocraft.item.model.CustomItem;
 import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
 import com.x1f4r.mmocraft.persistence.PersistenceService;
@@ -45,7 +47,9 @@ class PluginDiagnosticsServiceTest {
     @Mock
     private ResourceNodeRegistryService resourceNodeRegistryService;
     @Mock
-    private ConfigService configService;
+    private GameplayConfigService gameplayConfigService;
+    @Mock
+    private StatScalingConfig statScalingConfig;
     @Mock
     private PersistenceService persistenceService;
     @Mock
@@ -57,8 +61,9 @@ class PluginDiagnosticsServiceTest {
     void setUp() throws SQLException {
         lenient().when(skillRegistryService.getAllSkills()).thenReturn(defaultSkills());
         lenient().when(customItemRegistry.getAllItems()).thenReturn(defaultItems());
-        lenient().when(configService.getInt("stats.max-health")).thenReturn(100);
-        lenient().when(configService.getDouble("stats.base-damage")).thenReturn(5.0);
+        lenient().when(gameplayConfigService.getStatScalingConfig()).thenReturn(statScalingConfig);
+        lenient().when(statScalingConfig.getBaseHealth()).thenReturn(100L);
+        lenient().when(gameplayConfigService.getIssues()).thenReturn(List.of());
         lenient().when(persistenceService.getConnection()).thenReturn(connection);
         lenient().when(connection.isClosed()).thenReturn(false);
         lenient().when(activeNodeManager.getAllActiveNodesView()).thenReturn(Collections.emptyMap());
@@ -69,7 +74,7 @@ class PluginDiagnosticsServiceTest {
                 skillRegistryService,
                 activeNodeManager,
                 resourceNodeRegistryService,
-                configService,
+                gameplayConfigService,
                 persistenceService
         );
     }
@@ -111,6 +116,18 @@ class PluginDiagnosticsServiceTest {
         assertTrue(entries.stream().anyMatch(entry ->
                 entry.getSeverity() == PluginDiagnosticsService.Severity.ERROR
                         && entry.getMessage().contains("Database connectivity test failed")));
+    }
+
+    @Test
+    void runDiagnostics_whenConfigIssuesPresent_reportsMessages() {
+        GameplayConfigIssue issue = GameplayConfigIssue.warn("Crafting config", "invalid recipe");
+        when(gameplayConfigService.getIssues()).thenReturn(List.of(issue));
+
+        List<PluginDiagnosticsService.DiagnosticEntry> entries = diagnosticsService.runDiagnostics();
+
+        assertTrue(entries.stream().anyMatch(entry ->
+                entry.getMessage().contains("Crafting config")
+                        && entry.getDetail().orElse("").contains("invalid recipe")));
     }
 
     private Collection<Skill> defaultSkills() {

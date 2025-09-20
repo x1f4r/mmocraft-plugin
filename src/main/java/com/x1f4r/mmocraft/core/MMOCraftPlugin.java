@@ -13,6 +13,8 @@ import com.x1f4r.mmocraft.command.commands.MMOCraftInfoCommand;
 import com.x1f4r.mmocraft.command.commands.admin.MMOCAdminRootCommand;
 import com.x1f4r.mmocraft.config.BasicConfigService;
 import com.x1f4r.mmocraft.config.ConfigService;
+import com.x1f4r.mmocraft.config.gameplay.GameplayConfigIssue;
+import com.x1f4r.mmocraft.config.gameplay.GameplayConfigService;
 import com.x1f4r.mmocraft.crafting.service.BasicRecipeRegistryService;
 import com.x1f4r.mmocraft.crafting.service.RecipeRegistryService;
 import com.x1f4r.mmocraft.crafting.ui.CraftingUIManager;
@@ -27,6 +29,8 @@ import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
 import com.x1f4r.mmocraft.loot.listeners.MobDeathLootListener;
 import com.x1f4r.mmocraft.loot.service.BasicLootService;
 import com.x1f4r.mmocraft.loot.service.LootService;
+import com.x1f4r.mmocraft.loot.registry.LootTableRegistry;
+import com.x1f4r.mmocraft.crafting.config.CraftingRecipeLoader;
 import com.x1f4r.mmocraft.demo.DemoContentModule;
 import com.x1f4r.mmocraft.demo.DemoContentSettings;
 import com.x1f4r.mmocraft.persistence.PersistenceService;
@@ -34,6 +38,7 @@ import com.x1f4r.mmocraft.persistence.SqlitePersistenceService;
 import com.x1f4r.mmocraft.playerdata.BasicPlayerDataService;
 import com.x1f4r.mmocraft.playerdata.PlayerDataService;
 import com.x1f4r.mmocraft.playerdata.listeners.PlayerJoinQuitListener;
+import com.x1f4r.mmocraft.playerdata.model.PlayerProfile;
 import com.x1f4r.mmocraft.skill.service.BasicSkillRegistryService;
 import com.x1f4r.mmocraft.skill.service.SkillRegistryService;
 import com.x1f4r.mmocraft.statuseffect.manager.BasicStatusEffectManager;
@@ -55,6 +60,7 @@ import org.bukkit.scheduler.BukkitTask;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.Locale;
 import java.util.Properties;
@@ -81,6 +87,9 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private ResourceNodeRepository resourceNodeRepository;
     private ActiveNodeManager activeNodeManager;
     private LoggingUtil loggingUtil;
+    private GameplayConfigService gameplayConfigService;
+    private LootTableRegistry lootTableRegistry;
+    private CraftingRecipeLoader craftingRecipeLoader;
     private DemoContentSettings demoSettings = DemoContentSettings.disabled();
     private DemoContentModule demoContentModule;
     private BukkitTask statusEffectTickTask;
@@ -95,7 +104,14 @@ public final class MMOCraftPlugin extends JavaPlugin {
             return;
         }
 
-        DemoContentSettings configuredSettings = DemoContentSettings.fromConfig(configService, loggingUtil);
+        gameplayConfigService = new GameplayConfigService(
+                getDataFolder().toPath().resolve("config"),
+                resource -> getResource("config/" + resource),
+                loggingUtil);
+        PlayerProfile.setStatScalingConfig(gameplayConfigService.getStatScalingConfig());
+
+        DemoContentSettings configuredSettings = DemoContentSettings.fromDemoConfig(
+                gameplayConfigService.getDemoContentConfig(), loggingUtil);
         demoSettings = applySetupPreferenceOverrides(configuredSettings);
 
         if (!initCoreServices()) {
@@ -104,14 +120,14 @@ public final class MMOCraftPlugin extends JavaPlugin {
         }
 
         initGameplayServices();
-        demoContentModule = new DemoContentModule(this, loggingUtil);
+        demoContentModule = new DemoContentModule(this, loggingUtil, gameplayConfigService.getDemoContentConfig());
         applyDemoSettings(demoSettings);
         registerListeners();
         registerCommands();
         startSchedulers();
 
         loggingUtil.info("MMOCraft core loaded and all services initialized!");
-        loggingUtil.info("Default Max Health from config: " + configService.getInt("stats.max-health"));
+        loggingUtil.info("Default Max Health from config: " + gameplayConfigService.getStatScalingConfig().getBaseHealth());
         loggingUtil.debug("onEnable sequence completed. Debug logging is " + (configService.getBoolean("core.debug-logging") ? "enabled" : "disabled") + ".");
     }
 
@@ -213,6 +229,12 @@ public final class MMOCraftPlugin extends JavaPlugin {
         customSpawningService = new BasicCustomSpawningService(this, loggingUtil, mobStatProvider, lootService, customItemRegistry);
         zoneManager = new BasicZoneManager(this, loggingUtil, eventBusService, demoSettings.zonesEnabled());
 
+        lootTableRegistry = new LootTableRegistry(lootService, loggingUtil);
+        lootTableRegistry.applyConfig(gameplayConfigService.getLootTablesConfig());
+
+        craftingRecipeLoader = new CraftingRecipeLoader(recipeRegistryService, customItemRegistry, loggingUtil);
+        craftingRecipeLoader.applyConfig(gameplayConfigService.getCraftingConfig());
+
         resourceNodeRegistryService = new BasicResourceNodeRegistryService(loggingUtil);
         resourceNodeRepository = new ResourceNodeRepository(persistenceService, loggingUtil);
         resourceNodeRepository.initDatabaseSchema();
@@ -226,7 +248,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
                 skillRegistryService,
                 activeNodeManager,
                 resourceNodeRegistryService,
-                configService,
+                gameplayConfigService,
                 persistenceService
         );
     }
@@ -296,6 +318,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
     public ResourceNodeRegistryService getResourceNodeRegistryService() { return resourceNodeRegistryService; }
     public ActiveNodeManager getActiveNodeManager() { return activeNodeManager; }
     public LoggingUtil getLoggingUtil() { return loggingUtil; }
+    public GameplayConfigService getGameplayConfigService() { return gameplayConfigService; }
     public DemoContentSettings getDemoSettings() { return demoSettings; }
     public PluginDiagnosticsService getDiagnosticsService() { return diagnosticsService; }
 
@@ -356,12 +379,41 @@ public final class MMOCraftPlugin extends JavaPlugin {
     public void reloadPluginConfig() {
         if (configService != null) {
             configService.reloadConfig();
-            DemoContentSettings reloadedSettings = DemoContentSettings.fromConfig(configService, loggingUtil);
+            gameplayConfigService.reload();
+            PlayerProfile.setStatScalingConfig(gameplayConfigService.getStatScalingConfig());
+            if (lootTableRegistry != null) {
+                lootTableRegistry.applyConfig(gameplayConfigService.getLootTablesConfig());
+            }
+            if (craftingRecipeLoader != null) {
+                craftingRecipeLoader.applyConfig(gameplayConfigService.getCraftingConfig());
+            }
+            if (demoContentModule != null) {
+                demoContentModule.updateConfig(gameplayConfigService.getDemoContentConfig());
+            }
+            if (playerDataService instanceof BasicPlayerDataService basicService) {
+                basicService.refreshDerivedAttributesForOnlinePlayers();
+            }
+            DemoContentSettings reloadedSettings = DemoContentSettings.fromDemoConfig(
+                    gameplayConfigService.getDemoContentConfig(), loggingUtil);
             reloadedSettings = applySetupPreferenceOverrides(reloadedSettings);
             applyDemoSettings(reloadedSettings);
             loggingUtil.info("MMOCraft configuration reloaded via reloadPluginConfig().");
-            loggingUtil.info("Default Max Health after reload: " + configService.getInt("stats.max-health"));
+            loggingUtil.info("Default Max Health after reload: " + gameplayConfigService.getStatScalingConfig().getBaseHealth());
             loggingUtil.debug("Debug status after reload: " + (configService.getBoolean("core.debug-logging") ? "enabled" : "disabled") + ".");
+
+            var issues = gameplayConfigService.getIssues();
+            if (!issues.isEmpty()) {
+                loggingUtil.warning("Gameplay config reload completed with " + issues.size() +
+                        " issue(s). Run /mmocadm diagnostics for details.");
+                for (GameplayConfigIssue issue : issues) {
+                    String detail = issue.detail() != null ? " (" + issue.detail() + ")" : "";
+                    switch (issue.severity()) {
+                        case ERROR -> loggingUtil.severe("Config issue: " + issue.message() + detail);
+                        case WARNING -> loggingUtil.warning("Config issue: " + issue.message() + detail);
+                        default -> loggingUtil.info("Config note: " + issue.message() + detail);
+                    }
+                }
+            }
 
             if (eventBusService != null) {
                 eventBusService.call(new PluginReloadedEvent());

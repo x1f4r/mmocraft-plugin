@@ -1,6 +1,6 @@
 package com.x1f4r.mmocraft.demo;
 
-import com.x1f4r.mmocraft.config.ConfigService;
+import com.x1f4r.mmocraft.config.gameplay.DemoContentConfig;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 
 import java.util.ArrayList;
@@ -26,22 +26,23 @@ public record DemoContentSettings(
         return new DemoContentSettings(false, false, false, false, false, false, false);
     }
 
-    public static DemoContentSettings fromConfig(ConfigService configService, LoggingUtil logger) {
-        if (configService == null) {
+    public static DemoContentSettings fromDemoConfig(DemoContentConfig demoConfig, LoggingUtil logger) {
+        if (demoConfig == null) {
             if (logger != null) {
-                logger.warning("ConfigService not available while loading demo settings. Falling back to disabled state.");
+                logger.warning("DemoContentConfig missing while loading demo settings. Falling back to disabled state.");
             }
             return disabled();
         }
-        boolean master = configService.getBoolean("demo.enabled");
+        DemoContentConfig.DemoToggles toggles = demoConfig.getToggles();
+        boolean master = toggles.master();
         DemoContentSettings settings = new DemoContentSettings(
                 master,
-                master && configService.getBoolean("demo.items"),
-                master && configService.getBoolean("demo.skills"),
-                master && configService.getBoolean("demo.loot-tables"),
-                master && configService.getBoolean("demo.custom-spawns"),
-                master && configService.getBoolean("demo.resource-nodes"),
-                master && configService.getBoolean("demo.zones")
+                master && toggles.items(),
+                master && toggles.skills(),
+                master && toggles.lootTables(),
+                master && toggles.customSpawns(),
+                master && toggles.resourceNodes(),
+                master && toggles.zones()
         );
         if (logger != null) {
             if (!settings.masterEnabled()) {
