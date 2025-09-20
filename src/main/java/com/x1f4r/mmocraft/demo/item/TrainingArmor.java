@@ -44,7 +44,7 @@ public class TrainingArmor extends CustomItem {
     @Override
     public Map<Stat, Double> getStatModifiers() {
         Map<Stat, Double> mods = new EnumMap<>(Stat.class);
-        mods.put(Stat.VITALITY, 10.0);
+        mods.put(Stat.HEALTH, 25.0);
         mods.put(Stat.DEFENSE, 5.0);
         return mods;
     }

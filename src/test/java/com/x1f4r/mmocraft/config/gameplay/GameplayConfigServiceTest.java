@@ -25,28 +25,27 @@ class GameplayConfigServiceTest {
 
     private static final String STATS_YAML = """
             defaults:
-              base-stat: 9.0
+              base-investment: 4.0
               overrides:
-                agility: 7.5
-            derived:
-              base-health: 120
-              health-per-vitality: 6.0
-              health-per-level: 3.0
-              base-mana: 30
-              mana-per-wisdom: 4.0
-              mana-per-level: 2.0
-              base-critical-hit-chance: 0.1
-              crit-chance-per-agility: 0.02
-              crit-chance-per-luck: 0.01
-              base-critical-damage-bonus: 2.0
-              crit-damage-bonus-per-strength: 0.05
-              base-evasion-chance: 0.05
-              evasion-per-agility: 0.02
-              evasion-per-luck: 0.01
-              phys-reduction-per-defense: 0.02
-              max-phys-reduction: 0.9
-              magic-reduction-per-wisdom: 0.03
-              max-magic-reduction: 0.85
+                strength: 12.5
+            scaling:
+              health:
+                base: 140.0
+                per-point: 2.5
+                per-level: 8.0
+              critical_chance:
+                base: 25.0
+                per-point: 0.75
+                max: 95.0
+              defense:
+                base: 5.0
+                diminishing:
+                  threshold: 750.0
+                  multiplier: 0.4
+            combat:
+              defense-reduction-base: 120.0
+              max-damage-reduction: 0.92
+              max-evasion-chance: 0.55
             """;
 
     private static final String LOOT_YAML = """
@@ -134,9 +133,17 @@ class GameplayConfigServiceTest {
         ));
 
         StatScalingConfig stats = service.getStatScalingConfig();
-        assertEquals(120L, stats.getBaseHealth());
-        assertEquals(6.0, stats.getHealthPerVitality());
-        assertEquals(7.5, stats.getDefaultStatValue(Stat.AGILITY));
+        assertEquals(4.0, stats.getDefaultStatInvestment());
+        assertEquals(12.5, stats.getDefaultStatValue(Stat.STRENGTH));
+        assertEquals(140.0, stats.getStatRule(Stat.HEALTH).getBaseValue());
+        assertEquals(2.5, stats.getStatRule(Stat.HEALTH).getPerPoint());
+        assertEquals(0.75, stats.getStatRule(Stat.CRITICAL_CHANCE).getPerPoint());
+        assertEquals(95.0, stats.getStatRule(Stat.CRITICAL_CHANCE).getMaxValue());
+        assertEquals(120.0, stats.getDefenseReductionBase());
+        assertEquals(0.92, stats.getMaxDamageReduction());
+        assertEquals(0.55, stats.getMaxEvasionChance());
+        assertEquals(750.0, stats.getStatRule(Stat.DEFENSE).getDiminishingReturns().threshold());
+        assertEquals(0.4, stats.getStatRule(Stat.DEFENSE).getDiminishingReturns().multiplier());
 
         LootTablesConfig lootTables = service.getLootTablesConfig();
         assertEquals(1, lootTables.getTablesById().size());
@@ -167,7 +174,8 @@ class GameplayConfigServiceTest {
         GameplayConfigService service = createService(Map.of());
 
         StatScalingConfig stats = service.getStatScalingConfig();
-        assertEquals(StatScalingConfig.defaults().getBaseHealth(), stats.getBaseHealth());
+        assertEquals(StatScalingConfig.defaults().getStatRule(Stat.HEALTH).getBaseValue(),
+                stats.getStatRule(Stat.HEALTH).getBaseValue());
         assertTrue(service.getCraftingConfig().getRecipes().isEmpty());
 
         List<GameplayConfigIssue> issues = service.getIssues();

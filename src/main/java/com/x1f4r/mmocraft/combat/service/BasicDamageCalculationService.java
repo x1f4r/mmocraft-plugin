@@ -81,7 +81,8 @@ public class BasicDamageCalculationService implements DamageCalculationService {
             if (damageType == DamageType.PHYSICAL) {
                 currentDamage += attackerProfile.getStatValue(Stat.STRENGTH) * STRENGTH_DAMAGE_SCALING_PHYSICAL;
             } else if (damageType == DamageType.MAGICAL) {
-                currentDamage += attackerProfile.getStatValue(Stat.INTELLIGENCE) * INTELLIGENCE_DAMAGE_SCALING_MAGICAL;
+                double abilityPowerMultiplier = 1.0 + (attackerProfile.getStatValue(Stat.ABILITY_POWER) / 100.0);
+                currentDamage += attackerProfile.getStatValue(Stat.INTELLIGENCE) * INTELLIGENCE_DAMAGE_SCALING_MAGICAL * abilityPowerMultiplier;
             }
             // Critical Hit Check for players
             if (random.nextDouble() < attackerProfile.getCriticalHitChance()) {

@@ -1,24 +1,35 @@
 package com.x1f4r.mmocraft.playerdata.model;
 
 /**
- * Represents core player statistics that can influence various aspects of gameplay.
- * These are typically used as keys in a map to store their values.
+ * Represents player statistics inspired by Hypixel-style RPG attributes.
+ * These act as keys for persistent storage and for runtime calculations.
  */
 public enum Stat {
-    // Offensive Stats
-    STRENGTH("Strength", "Increases physical damage and carrying capacity."),
-    AGILITY("Agility", "Increases attack speed, critical hit chance, and evasion."),
-    INTELLIGENCE("Intelligence", "Increases magical damage and effectiveness of spells."),
+    // Core combat stats
+    HEALTH("Health", "Increases maximum health."),
+    DEFENSE("Defense", "Reduces incoming non-true damage."),
+    TRUE_DEFENSE("True Defense", "Reduces incoming true damage."),
+    STRENGTH("Strength", "Increases melee and physical damage."),
+    CRITICAL_CHANCE("Critical Chance", "Increases the chance for attacks to crit."),
+    CRITICAL_DAMAGE("Critical Damage", "Increases the damage dealt by critical hits."),
+    INTELLIGENCE("Intelligence", "Increases mana capacity and spell scaling."),
+    MANA_REGEN("Mana Regeneration", "Improves passive mana regeneration."),
+    ABILITY_POWER("Ability Power", "Boosts ability and spell damage."),
+    ATTACK_SPEED("Attack Speed", "Improves weapon swing rate."),
+    FEROCITY("Ferocity", "Chance to strike additional times."),
+    EVASION("Evasion", "Chance to dodge incoming attacks."),
 
-    // Defensive Stats
-    DEFENSE("Defense", "Reduces incoming physical damage."),
-    VITALITY("Vitality", "Increases maximum health points."),
-    WISDOM("Wisdom", "Increases maximum mana points and mana regeneration."),
+    // Utility and progression stats
+    SPEED("Speed", "Increases movement speed up to the configured cap."),
+    MAGIC_FIND("Magic Find", "Improves chances for rare loot drops."),
+    PET_LUCK("Pet Luck", "Improves chances for higher-quality pets."),
 
-    // Other Potential Stats
-    LUCK("Luck", "Influences chances of rare item drops and other random events."),
-    PERCEPTION("Perception", "Affects detection range and accuracy.");
-    // Add more stats as needed, e.g., RESISTANCE_FIRE, RESISTANCE_COLD, etc.
+    // Gathering stats
+    MINING_SPEED("Mining Speed", "Determines how fast blocks are broken."),
+    MINING_FORTUNE("Mining Fortune", "Increases drops from mining blocks."),
+    FARMING_FORTUNE("Farming Fortune", "Increases crops harvested per break."),
+    FORAGING_FORTUNE("Foraging Fortune", "Increases drops from foraging."),
+    FISHING_FORTUNE("Fishing Fortune", "Improves treasure from fishing.");
 
     private final String displayName;
     private final String description;

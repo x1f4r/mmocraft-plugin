@@ -58,7 +58,7 @@ MMOCraft is built on a collection of robust, interconnected systems.
 
 ### Player Data & Statistics
 *   **Persistent Player Profiles:** Player data (stats, level, XP, currency) is stored in an SQLite database and managed asynchronously to prevent server lag.
-*   **Core Stats System:** A flexible system based on core stats (`STRENGTH`, `VITALITY`, `AGILITY`, etc.).
+*   **Core Stats System:** A flexible system based on Hypixel-style stats (`STRENGTH`, `HEALTH`, `DEFENSE`, `INTELLIGENCE`, `CRIT CHANCE`, etc.).
 *   **Derived Attributes:** Player attributes like Max Health, Max Mana, Critical Hit Chance, and Evasion are dynamically calculated based on their core stats and level.
 *   **Experience & Leveling:** A configurable leveling curve and an API for granting experience from various sources (mob kills, quests, etc.).
 

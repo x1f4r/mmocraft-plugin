@@ -43,6 +43,7 @@ public class PlayerProfile {
 
     // --- Equipment Stat Modifiers ---
     private final Map<Stat, Double> equipmentStatModifiers = new EnumMap<>(Stat.class); // Added
+    private final Map<Stat, Double> effectiveStats = new EnumMap<>(Stat.class);
 
     // --- Derived Secondary Stats ---
     private double criticalHitChance;
@@ -59,6 +60,13 @@ public class PlayerProfile {
 
     private static StatScalingConfig getStatScalingConfig() {
         return statScalingConfig;
+    }
+
+    private void ensureAllStatsInitialized() {
+        StatScalingConfig config = getStatScalingConfig();
+        for (Stat stat : Stat.values()) {
+            coreStats.putIfAbsent(stat, config.getDefaultStatValue(stat));
+        }
     }
 
 
@@ -85,6 +93,7 @@ public class PlayerProfile {
         for (Stat stat : Stat.values()) {
             this.coreStats.put(stat, config.getDefaultStatValue(stat));
         }
+        ensureAllStatsInitialized();
 
         LocalDateTime now = LocalDateTime.now();
         this.firstLogin = now;
@@ -111,6 +120,7 @@ public class PlayerProfile {
         this.experience = experience;
         this.currency = currency;
         this.coreStats = new EnumMap<>(Objects.requireNonNull(coreStats, "Core stats map cannot be null."));
+        ensureAllStatsInitialized();
         this.firstLogin = Objects.requireNonNull(firstLogin, "First login time cannot be null.");
         this.lastLogin = Objects.requireNonNull(lastLogin, "Last login time cannot be null.");
 
@@ -134,6 +144,8 @@ public class PlayerProfile {
     public long getCurrency() { return currency; }
     public Map<Stat, Double> getCoreStats() { return new EnumMap<>(coreStats); } // Returns base stats
 
+    public Map<Stat, Double> getEffectiveStats() { return new EnumMap<>(effectiveStats); }
+
     /**
      * Gets the base value of a core stat (before equipment or other temporary modifiers).
      * @param stat The stat to retrieve.
@@ -150,8 +162,16 @@ public class PlayerProfile {
      * @return The effective value of the stat.
      */
     public Double getStatValue(Stat stat) {
+        return effectiveStats.getOrDefault(Objects.requireNonNull(stat), 0.0);
+    }
+
+    /**
+     * Gets the invested value for a stat before scaling rules are applied.
+     * @param stat The stat to retrieve.
+     * @return Base plus equipment contributions.
+     */
+    public double getTotalInvestedStatValue(Stat stat) {
         return getBaseStatValue(stat) + getEquipmentStatModifier(stat);
-        // Future: + getTemporaryStatusEffectModifier(stat);
     }
 
     public LocalDateTime getFirstLogin() { return firstLogin; }
@@ -168,12 +188,12 @@ public class PlayerProfile {
     public void setPlayerName(String playerName) { this.playerName = Objects.requireNonNull(playerName, "Player name cannot be null."); }
 
     public void setCurrentHealth(long currentHealth) {
-        this.currentHealth = Math.max(0, Math.min(currentHealth, this.maxHealth));
+        this.currentHealth = Math.max(0L, Math.min(currentHealth, this.maxHealth));
     }
     // setMaxHealth is now implicitly handled by recalculateDerivedAttributes via stats/level
 
     public void setCurrentMana(long currentMana) {
-        this.currentMana = Math.max(0, Math.min(currentMana, this.maxMana));
+        this.currentMana = Math.max(0L, Math.min(currentMana, this.maxMana));
     }
     // setMaxMana is now implicitly handled by recalculateDerivedAttributes via stats/level
 
@@ -186,10 +206,11 @@ public class PlayerProfile {
 
     public void setCoreStats(Map<Stat, Double> coreStats) {
         this.coreStats = new EnumMap<>(Objects.requireNonNull(coreStats));
+        ensureAllStatsInitialized();
         recalculateDerivedAttributes();
     }
     public void setStatValue(Stat stat, double value) {
-        this.coreStats.put(Objects.requireNonNull(stat), Math.max(0, value)); // Modifies BASE stat
+        this.coreStats.put(Objects.requireNonNull(stat), value); // Modifies BASE stat
         recalculateDerivedAttributes();
     }
 
@@ -248,37 +269,45 @@ public class PlayerProfile {
     public void recalculateDerivedAttributes() {
         StatScalingConfig config = getStatScalingConfig();
 
-        double computedMaxHealth = config.getBaseHealth()
-                + (getStatValue(Stat.VITALITY) * config.getHealthPerVitality())
-                + (this.level * config.getHealthPerLevel());
-        this.maxHealth = Math.max(1L, Math.round(computedMaxHealth));
-        this.currentHealth = Math.min(this.currentHealth, this.maxHealth);
+        effectiveStats.clear();
+        for (Stat stat : Stat.values()) {
+            StatScalingConfig.StatRule rule = config.getStatRule(stat);
+            double invested = getTotalInvestedStatValue(stat);
+            double computed = rule.compute(invested, this.level);
+            effectiveStats.put(stat, computed);
+        }
 
-        double computedMaxMana = config.getBaseMana()
-                + (getStatValue(Stat.WISDOM) * config.getManaPerWisdom())
-                + (this.level * config.getManaPerLevel());
-        this.maxMana = Math.max(0L, Math.round(computedMaxMana));
-        this.currentMana = Math.min(this.currentMana, this.maxMana);
+        double healthStat = effectiveStats.getOrDefault(Stat.HEALTH,
+                config.getStatRule(Stat.HEALTH).compute(0.0, this.level));
+        this.maxHealth = Math.max(1L, Math.round(healthStat));
+        this.currentHealth = Math.max(0L, Math.min(this.currentHealth, this.maxHealth));
 
-        double critChance = config.getBaseCriticalHitChance()
-                + (getStatValue(Stat.AGILITY) * config.getCritChancePerAgility())
-                + (getStatValue(Stat.LUCK) * config.getCritChancePerLuck());
-        this.criticalHitChance = Math.max(0.0, Math.min(critChance, 1.0));
+        double manaStat = effectiveStats.getOrDefault(Stat.INTELLIGENCE,
+                config.getStatRule(Stat.INTELLIGENCE).compute(0.0, this.level));
+        this.maxMana = Math.max(0L, Math.round(manaStat));
+        this.currentMana = Math.max(0L, Math.min(this.currentMana, this.maxMana));
 
-        double critDamage = config.getBaseCriticalDamageBonus()
-                + (getStatValue(Stat.STRENGTH) * config.getCritDamageBonusPerStrength());
-        this.criticalDamageBonus = Math.max(1.0, critDamage);
+        double critChancePercent = effectiveStats.getOrDefault(Stat.CRITICAL_CHANCE, 0.0);
+        this.criticalHitChance = clamp(0.0, 1.0, critChancePercent / 100.0);
 
-        double evasion = config.getBaseEvasionChance()
-                + (getStatValue(Stat.AGILITY) * config.getEvasionPerAgility())
-                + (getStatValue(Stat.LUCK) * config.getEvasionPerLuck());
-        this.evasionChance = Math.max(0.0, Math.min(evasion, 0.95));
+        double critDamagePercent = effectiveStats.getOrDefault(Stat.CRITICAL_DAMAGE, 0.0);
+        this.criticalDamageBonus = Math.max(1.0, 1.0 + (critDamagePercent / 100.0));
 
-        double physReduction = getStatValue(Stat.DEFENSE) * config.getPhysReductionPerDefense();
-        this.physicalDamageReduction = Math.max(0.0, Math.min(physReduction, config.getMaxPhysReduction()));
+        double evasionPercent = effectiveStats.getOrDefault(Stat.EVASION, 0.0);
+        this.evasionChance = clamp(0.0, config.getMaxEvasionChance(), evasionPercent / 100.0);
 
-        double magicRed = getStatValue(Stat.WISDOM) * config.getMagicReductionPerWisdom();
-        this.magicDamageReduction = Math.max(0.0, Math.min(magicRed, config.getMaxMagicReduction()));
+        double defenseValue = Math.max(0.0, effectiveStats.getOrDefault(Stat.DEFENSE, 0.0));
+        double trueDefenseValue = Math.max(0.0, effectiveStats.getOrDefault(Stat.TRUE_DEFENSE, 0.0));
+        double defenseReduction = defenseValue <= 0.0
+                ? 0.0
+                : defenseValue / (defenseValue + config.getDefenseReductionBase());
+        double trueDefenseReduction = trueDefenseValue <= 0.0
+                ? 0.0
+                : trueDefenseValue / (trueDefenseValue + config.getTrueDefenseReductionBase());
+        double combinedReduction = 1.0 - ((1.0 - defenseReduction) * (1.0 - trueDefenseReduction));
+        double clampedReduction = clamp(0.0, config.getMaxDamageReduction(), combinedReduction);
+        this.physicalDamageReduction = clampedReduction;
+        this.magicDamageReduction = clampedReduction;
     }
 
 
@@ -353,6 +382,10 @@ public class PlayerProfile {
     public void consumeMana(long amount) {
         if (amount <= 0) return;
         setCurrentMana(this.currentMana - amount);
+    }
+
+    private static double clamp(double min, double max, double value) {
+        return Math.max(min, Math.min(max, value));
     }
 
     @Override

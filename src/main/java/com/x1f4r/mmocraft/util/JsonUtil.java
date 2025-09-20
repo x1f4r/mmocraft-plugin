@@ -14,11 +14,11 @@ import java.util.regex.Pattern;
 public class JsonUtil {
 
     // Pattern to match "STAT_NAME":value entries
-    private static final Pattern STAT_ENTRY_PATTERN = Pattern.compile("\"([A-Z_]+)\":([0-9]*\\.?[0-9]+)");
+    private static final Pattern STAT_ENTRY_PATTERN = Pattern.compile("\"([A-Z_]+)\":(-?[0-9]*\\.?[0-9]+)");
 
     /**
      * Converts a Map<Stat, Double> to a simple JSON-like string.
-     * Example: {"STRENGTH":10.0,"AGILITY":12.5}
+     * Example: {"STRENGTH":10.0,"SPEED":12.5}
      *
      * @param statsMap The map of stats to serialize.
      * @return A JSON-like string representation.

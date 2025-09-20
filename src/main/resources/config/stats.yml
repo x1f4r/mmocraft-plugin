@@ -1,36 +1,119 @@
 # ------------------------------------------------------------
-# Player stat scaling controls
+# Hypixel-inspired player stat scaling controls
 # ------------------------------------------------------------
-# "defaults" specifies the baseline value for each core stat when
-# a new profile is created. "base-stat" is applied to every stat
-# unless an override is defined under "overrides".
-#
-# "derived" contains the coefficients used when converting core
-# stats and player level into derived combat attributes.
-# ------------------------------------------------------------
-
 defaults:
-  base-stat: 10.0
-  overrides:
-    vitality: 12.0
-    wisdom: 11.0
+  base-investment: 0.0
+  overrides: {}
 
-derived:
-  base-health: 50
-  health-per-vitality: 5.0
-  health-per-level: 2.0
-  base-mana: 20
-  mana-per-wisdom: 3.0
-  mana-per-level: 1.0
-  base-critical-hit-chance: 0.05
-  crit-chance-per-agility: 0.005
-  crit-chance-per-luck: 0.002
-  base-critical-damage-bonus: 1.5
-  crit-damage-bonus-per-strength: 0.01
-  base-evasion-chance: 0.02
-  evasion-per-agility: 0.004
-  evasion-per-luck: 0.001
-  phys-reduction-per-defense: 0.005
-  max-phys-reduction: 0.80
-  magic-reduction-per-wisdom: 0.003
-  max-magic-reduction: 0.80
+scaling:
+  health:
+    base: 100.0
+    per-point: 1.0
+    per-level: 5.0
+    min: 1.0
+  defense:
+    base: 0.0
+    per-point: 1.0
+    per-level: 0.5
+    diminishing:
+      threshold: 1000.0
+      multiplier: 0.5
+  true_defense:
+    base: 0.0
+    per-point: 1.0
+    per-level: 0.25
+  strength:
+    base: 0.0
+    per-point: 1.0
+    per-level: 0.75
+  critical_chance:
+    base: 30.0
+    per-point: 0.5
+    per-level: 0.25
+    min: 0.0
+    max: 100.0
+  critical_damage:
+    base: 50.0
+    per-point: 1.0
+    per-level: 0.5
+    min: 0.0
+  intelligence:
+    base: 100.0
+    per-point: 1.0
+    per-level: 3.0
+    min: 0.0
+  mana_regen:
+    base: 5.0
+    per-point: 0.25
+    per-level: 0.1
+    min: 0.0
+  ability_power:
+    base: 0.0
+    per-point: 1.0
+    per-level: 0.5
+    min: 0.0
+  attack_speed:
+    base: 0.0
+    per-point: 0.5
+    per-level: 0.2
+    min: 0.0
+    max: 100.0
+  ferocity:
+    base: 0.0
+    per-point: 0.5
+    per-level: 0.2
+    min: 0.0
+  evasion:
+    base: 0.0
+    per-point: 0.5
+    per-level: 0.2
+    min: 0.0
+    max: 60.0
+  speed:
+    base: 100.0
+    per-point: 0.25
+    per-level: 0.15
+    min: 0.0
+    max: 400.0
+  magic_find:
+    base: 0.0
+    per-point: 0.25
+    per-level: 0.05
+    min: 0.0
+  pet_luck:
+    base: 0.0
+    per-point: 0.1
+    per-level: 0.05
+    min: 0.0
+  mining_speed:
+    base: 0.0
+    per-point: 2.0
+    per-level: 1.0
+    min: 0.0
+  mining_fortune:
+    base: 0.0
+    per-point: 1.0
+    per-level: 0.5
+    min: 0.0
+  farming_fortune:
+    base: 0.0
+    per-point: 1.0
+    per-level: 0.5
+    min: 0.0
+  foraging_fortune:
+    base: 0.0
+    per-point: 1.0
+    per-level: 0.5
+    min: 0.0
+  fishing_fortune:
+    base: 0.0
+    per-point: 1.0
+    per-level: 0.5
+    min: 0.0
+
+combat:
+  defense-reduction-base: 100.0
+  true-defense-reduction-base: 100.0
+  max-damage-reduction: 0.9
+  max-evasion-chance: 0.6
+
