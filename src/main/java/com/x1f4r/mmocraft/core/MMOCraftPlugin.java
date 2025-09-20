@@ -51,6 +51,7 @@ import com.x1f4r.mmocraft.world.resourcegathering.persistence.ResourceNodeReposi
 import com.x1f4r.mmocraft.world.spawning.service.BasicCustomSpawningService;
 import com.x1f4r.mmocraft.world.spawning.service.CustomSpawningService;
 import com.x1f4r.mmocraft.world.zone.listeners.PlayerZoneTrackerListener;
+import org.bukkit.event.HandlerList;
 import com.x1f4r.mmocraft.world.zone.runtime.ZoneStatApplier;
 import com.x1f4r.mmocraft.world.zone.service.BasicZoneManager;
 import com.x1f4r.mmocraft.world.zone.service.ZoneManager;
@@ -267,7 +268,11 @@ public final class MMOCraftPlugin extends JavaPlugin {
                 activeNodeManager,
                 resourceNodeRegistryService,
                 gameplayConfigService,
-                persistenceService
+                persistenceService,
+                recipeRegistryService,
+                this::getDemoSettings,
+                this,
+                HandlerList::getRegisteredListeners
         );
     }
 

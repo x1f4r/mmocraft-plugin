@@ -53,7 +53,14 @@ public class CraftingRecipeLoader {
                 managedRecipeIds.add(recipe.getRecipeId().toLowerCase(Locale.ROOT));
                 logger.info("Registered config recipe: " + recipe.getRecipeId());
             } catch (Exception ex) {
-                logger.warning("Failed to register recipe '" + definition.id() + "': " + ex.getMessage());
+                logger.structuredWarning(
+                        "crafting-config",
+                        "Failed to register crafting recipe.",
+                        Map.of(
+                                "recipeId", definition.id(),
+                                "reason", ex.getMessage()
+                        )
+                );
             }
         }
     }

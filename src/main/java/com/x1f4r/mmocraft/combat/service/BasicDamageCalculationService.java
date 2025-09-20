@@ -16,6 +16,7 @@ import org.bukkit.entity.Projectile;
 import org.bukkit.metadata.MetadataValue;
 import org.bukkit.projectiles.ProjectileSource;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
@@ -49,10 +50,28 @@ public class BasicDamageCalculationService implements DamageCalculationService {
         PlayerProfile victimProfile = playerDataService.getPlayerProfile(victimId);
 
         if (actualAttacker instanceof Player && attackerProfile == null) {
-            logger.warning("Attacker Player " + actualAttacker.getName() + " has no PlayerProfile in cache. Using raw damage.");
+            logger.structuredWarning(
+                    "stat-calculation",
+                    "Missing attacker profile for damage calculation.",
+                    Map.of(
+                            "attacker", actualAttacker.getName(),
+                            "attackerType", actualAttacker.getType().name(),
+                            "victim", victim.getName(),
+                            "damageType", damageType.name()
+                    )
+            );
         }
         if (victim instanceof Player && victimProfile == null) {
-            logger.warning("Victim Player " + victim.getName() + " has no PlayerProfile in cache. Will take damage without profile-based mitigation.");
+            logger.structuredWarning(
+                    "stat-calculation",
+                    "Missing victim profile for mitigation calculation.",
+                    Map.of(
+                            "victim", victim.getName(),
+                            "victimType", victim.getType().name(),
+                            "attacker", actualAttacker != null ? actualAttacker.getName() : "unknown",
+                            "damageType", damageType.name()
+                    )
+            );
         }
 
         RuntimeStatConfig runtimeConfig = gameplayConfigService.getRuntimeStatConfig();
