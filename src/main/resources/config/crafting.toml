@@ -1,8 +1,9 @@
 # ------------------------------------------------------------
 # Custom crafting recipes
 # ------------------------------------------------------------
-# Recipes are disabled by default to preserve current behaviour.
-# Flip "enabled" to true and reload to activate them.
+# Demo progression recipes ship enabled so the showcase loop
+# is available out of the box. Toggle individual entries as
+# desired for custom deployments.
 # ------------------------------------------------------------
 
 [[recipes]]
@@ -25,3 +26,147 @@ quantity = 2
 type = "VANILLA"
 id = "STICK"
 quantity = 1
+
+[[recipes]]
+id = "windrunner_boots"
+enabled = true
+type = "CUSTOM_SHAPELESS"
+permission = ""
+
+[recipes.output]
+type = "CUSTOM"
+id = "windrunner_boots"
+amount = 1
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "LEATHER_BOOTS"
+quantity = 1
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "FEATHER"
+quantity = 4
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "SUGAR"
+quantity = 4
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "PHANTOM_MEMBRANE"
+quantity = 2
+
+[[recipes]]
+id = "guardian_bulwark"
+enabled = true
+type = "CUSTOM_SHAPED"
+permission = ""
+
+[recipes.output]
+type = "CUSTOM"
+id = "guardian_bulwark"
+amount = 1
+
+[recipes.shaped."0"]
+type = "VANILLA"
+id = "IRON_BLOCK"
+quantity = 1
+
+[recipes.shaped."1"]
+type = "VANILLA"
+id = "DIAMOND"
+quantity = 1
+
+[recipes.shaped."2"]
+type = "VANILLA"
+id = "IRON_BLOCK"
+quantity = 1
+
+[recipes.shaped."3"]
+type = "VANILLA"
+id = "DIAMOND"
+quantity = 1
+
+[recipes.shaped."4"]
+type = "VANILLA"
+id = "DIAMOND_CHESTPLATE"
+quantity = 1
+
+[recipes.shaped."5"]
+type = "VANILLA"
+id = "DIAMOND"
+quantity = 1
+
+[recipes.shaped."6"]
+type = "VANILLA"
+id = "IRON_BLOCK"
+quantity = 1
+
+[recipes.shaped."7"]
+type = "VANILLA"
+id = "DIAMOND"
+quantity = 1
+
+[recipes.shaped."8"]
+type = "VANILLA"
+id = "IRON_BLOCK"
+quantity = 1
+
+[[recipes]]
+id = "lucky_charm"
+enabled = true
+type = "CUSTOM_SHAPELESS"
+permission = ""
+
+[recipes.output]
+type = "CUSTOM"
+id = "lucky_charm_talisman"
+amount = 1
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "GOLD_INGOT"
+quantity = 2
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "EMERALD"
+quantity = 1
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "RABBIT_FOOT"
+quantity = 1
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "LAPIS_LAZULI"
+quantity = 4
+
+[[recipes]]
+id = "foragers_hatchet"
+enabled = true
+type = "CUSTOM_SHAPELESS"
+permission = ""
+
+[recipes.output]
+type = "CUSTOM"
+id = "foragers_hatchet"
+amount = 1
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "DIAMOND_AXE"
+quantity = 1
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "OAK_LOG"
+quantity = 8
+
+[[recipes.ingredients]]
+type = "VANILLA"
+id = "BONE_MEAL"
+quantity = 4

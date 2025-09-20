@@ -2,10 +2,29 @@ package com.x1f4r.mmocraft.demo;
 
 import com.x1f4r.mmocraft.config.gameplay.DemoContentConfig;
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
+import com.x1f4r.mmocraft.demo.item.AnglersTidalRod;
+import com.x1f4r.mmocraft.demo.item.BerserkerGauntlet;
+import com.x1f4r.mmocraft.demo.item.BlazingEmberRod;
+import com.x1f4r.mmocraft.demo.item.ForagersHatchet;
+import com.x1f4r.mmocraft.demo.item.GuardianBulwark;
+import com.x1f4r.mmocraft.demo.item.HarvestersScythe;
+import com.x1f4r.mmocraft.demo.item.LuckyCharmTalisman;
+import com.x1f4r.mmocraft.demo.item.ProspectorsDrill;
 import com.x1f4r.mmocraft.demo.item.SimpleSword;
 import com.x1f4r.mmocraft.demo.item.TrainingArmor;
+import com.x1f4r.mmocraft.demo.item.WindrunnerBoots;
+import com.x1f4r.mmocraft.demo.skill.BerserkerRageSkill;
+import com.x1f4r.mmocraft.demo.skill.GaleForceDashSkill;
+import com.x1f4r.mmocraft.demo.skill.HarvestRallySkill;
+import com.x1f4r.mmocraft.demo.skill.InfernoBurstSkill;
 import com.x1f4r.mmocraft.demo.skill.MinorHealSkill;
+import com.x1f4r.mmocraft.demo.skill.ProspectorPulseSkill;
 import com.x1f4r.mmocraft.demo.skill.StrongStrikeSkill;
+import com.x1f4r.mmocraft.demo.skill.TidalSurgeSkill;
+import com.x1f4r.mmocraft.crafting.model.CustomRecipeIngredient;
+import com.x1f4r.mmocraft.crafting.model.RecipeType;
+import com.x1f4r.mmocraft.crafting.recipe.CustomRecipe;
+import com.x1f4r.mmocraft.crafting.service.RecipeRegistryService;
 import com.x1f4r.mmocraft.item.model.CustomItem;
 import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
 import com.x1f4r.mmocraft.loot.model.LootTable;
@@ -37,6 +56,7 @@ import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -53,10 +73,12 @@ public final class DemoContentModule {
     private DemoContentSettings currentSettings = DemoContentSettings.disabled();
     private final Set<String> registeredItemIds = new HashSet<>();
     private final Set<String> registeredSkillIds = new HashSet<>();
+    private final Set<String> registeredRecipeIds = new HashSet<>();
     private final Set<String> registeredResourceNodeTypeIds = new HashSet<>();
     private final Set<String> registeredGenericLootTableIds = new HashSet<>();
     private final Map<EntityType, String> registeredMobLootTableIds = new EnumMap<>(EntityType.class);
     private final Set<String> registeredSpawnRuleIds = new HashSet<>();
+    private static final String INFUSION_PERMISSION = "mmocraft.craft.infusion";
 
     public DemoContentModule(MMOCraftPlugin plugin, LoggingUtil logger, DemoContentConfig demoConfig) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -87,6 +109,7 @@ public final class DemoContentModule {
         logger.info("Applying demo content: " + newSettings.describeEnabledFeatures());
         if (newSettings.itemsEnabled()) {
             executeSafely("register demo items", this::registerDemoItems);
+            executeSafely("register demo crafting recipes", this::registerDemoCraftingRecipes);
         }
         if (newSettings.skillsEnabled()) {
             executeSafely("register demo skills", this::registerDemoSkills);
@@ -126,8 +149,20 @@ public final class DemoContentModule {
             logger.severe("CustomItemRegistry not initialized. Demo items cannot be registered.");
             return;
         }
-        registerItemIfAbsent(registry, new SimpleSword(plugin));
-        registerItemIfAbsent(registry, new TrainingArmor(plugin));
+        List<CustomItem> items = List.of(
+                new SimpleSword(plugin),
+                new TrainingArmor(plugin),
+                new BlazingEmberRod(plugin),
+                new WindrunnerBoots(plugin),
+                new GuardianBulwark(plugin),
+                new BerserkerGauntlet(plugin),
+                new LuckyCharmTalisman(plugin),
+                new ProspectorsDrill(plugin),
+                new HarvestersScythe(plugin),
+                new ForagersHatchet(plugin),
+                new AnglersTidalRod(plugin)
+        );
+        items.forEach(item -> registerItemIfAbsent(registry, item));
     }
 
     private void registerItemIfAbsent(CustomItemRegistry registry, CustomItem item) {
@@ -139,6 +174,90 @@ public final class DemoContentModule {
         registeredItemIds.add(item.getItemId());
     }
 
+    private void registerDemoCraftingRecipes() {
+        RecipeRegistryService recipeRegistry = plugin.getRecipeRegistryService();
+        CustomItemRegistry itemRegistry = plugin.getCustomItemRegistry();
+        if (recipeRegistry == null || itemRegistry == null) {
+            logger.severe("Crafting services unavailable. Demo recipes cannot be registered.");
+            return;
+        }
+
+        registerInfusionRecipe(recipeRegistry, itemRegistry,
+                "infusion_blazing_ember_rod",
+                BlazingEmberRod.ITEM_ID,
+                List.of(
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "BLAZE_ROD", 1),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "MAGMA_CREAM", 2),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "BLAZE_POWDER", 4),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "GHAST_TEAR", 1)
+                ));
+
+        registerInfusionRecipe(recipeRegistry, itemRegistry,
+                "infusion_berserker_gauntlet",
+                BerserkerGauntlet.ITEM_ID,
+                List.of(
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "DIAMOND_AXE", 1),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "MAGMA_CREAM", 1),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "RABBIT_FOOT", 2),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "NETHERITE_SCRAP", 1)
+                ));
+
+        registerInfusionRecipe(recipeRegistry, itemRegistry,
+                "infusion_prospectors_drill",
+                ProspectorsDrill.ITEM_ID,
+                List.of(
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "DIAMOND_PICKAXE", 1),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "REDSTONE_BLOCK", 2),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "GOLD_BLOCK", 1),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "EMERALD", 3)
+                ));
+
+        registerInfusionRecipe(recipeRegistry, itemRegistry,
+                "infusion_harvesters_scythe",
+                HarvestersScythe.ITEM_ID,
+                List.of(
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "DIAMOND_HOE", 1),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "HAY_BLOCK", 3),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "PUMPKIN", 2),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "SUGAR_CANE", 4)
+                ));
+
+        registerInfusionRecipe(recipeRegistry, itemRegistry,
+                "infusion_anglers_rod",
+                AnglersTidalRod.ITEM_ID,
+                List.of(
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "FISHING_ROD", 1),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "PRISMARINE_SHARD", 3),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "PRISMARINE_CRYSTALS", 2),
+                        ingredient(CustomRecipeIngredient.IngredientType.VANILLA_MATERIAL, "NAUTILUS_SHELL", 1)
+                ));
+    }
+
+    private void registerInfusionRecipe(RecipeRegistryService recipeRegistry,
+                                        CustomItemRegistry itemRegistry,
+                                        String recipeId,
+                                        String outputItemId,
+                                        List<CustomRecipeIngredient> ingredients) {
+        if (recipeRegistry.getRecipeById(recipeId).isPresent()) {
+            logger.debug("Demo recipe '" + recipeId + "' already exists. Skipping.");
+            return;
+        }
+        Optional<CustomItem> outputDefinition = itemRegistry.getCustomItem(outputItemId);
+        if (outputDefinition.isEmpty()) {
+            logger.warning("Cannot register demo recipe '" + recipeId + "': missing item '" + outputItemId + "'.");
+            return;
+        }
+        ItemStack outputStack = outputDefinition.get().createItemStack(1);
+        CustomRecipe recipe = new CustomRecipe(recipeId, outputStack, RecipeType.CUSTOM_SHAPELESS, ingredients, INFUSION_PERMISSION);
+        recipeRegistry.registerRecipe(recipe);
+        registeredRecipeIds.add(recipeId.toLowerCase(Locale.ROOT));
+        logger.info("Registered demo infusion recipe: " + recipeId);
+    }
+
+    private CustomRecipeIngredient ingredient(CustomRecipeIngredient.IngredientType type, String identifier, int quantity) {
+        return new CustomRecipeIngredient(type, identifier, quantity);
+    }
+
     private void registerDemoSkills() {
         SkillRegistryService registry = plugin.getSkillRegistryService();
         if (registry == null) {
@@ -147,6 +266,12 @@ public final class DemoContentModule {
         }
         registerSkillIfAbsent(registry, new StrongStrikeSkill(plugin));
         registerSkillIfAbsent(registry, new MinorHealSkill(plugin));
+        registerSkillIfAbsent(registry, new InfernoBurstSkill(plugin));
+        registerSkillIfAbsent(registry, new GaleForceDashSkill(plugin));
+        registerSkillIfAbsent(registry, new BerserkerRageSkill(plugin));
+        registerSkillIfAbsent(registry, new ProspectorPulseSkill(plugin));
+        registerSkillIfAbsent(registry, new HarvestRallySkill(plugin));
+        registerSkillIfAbsent(registry, new TidalSurgeSkill(plugin));
     }
 
     private void registerSkillIfAbsent(SkillRegistryService registry, Skill skill) {
@@ -350,6 +475,7 @@ public final class DemoContentModule {
         unregisterCustomSpawns();
         unregisterLootTables();
         unregisterSkills();
+        unregisterRecipes();
         unregisterItems();
     }
 
@@ -379,6 +505,20 @@ public final class DemoContentModule {
             }
         }
         registeredSkillIds.clear();
+    }
+
+    private void unregisterRecipes() {
+        RecipeRegistryService recipeRegistry = plugin.getRecipeRegistryService();
+        if (recipeRegistry == null) {
+            registeredRecipeIds.clear();
+            return;
+        }
+        for (String recipeId : new HashSet<>(registeredRecipeIds)) {
+            if (recipeRegistry.unregisterRecipe(recipeId)) {
+                logger.info("Unregistered demo recipe: " + recipeId);
+            }
+        }
+        registeredRecipeIds.clear();
     }
 
     private void unregisterLootTables() {
