@@ -1,6 +1,7 @@
 package com.x1f4r.mmocraft.demo.item;
 
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
+import com.x1f4r.mmocraft.demo.skill.LuckySpriteSummonSkill;
 import com.x1f4r.mmocraft.item.model.CustomItem;
 import com.x1f4r.mmocraft.item.model.ItemAbilityDescriptor;
 import com.x1f4r.mmocraft.item.model.ItemRarity;
@@ -17,8 +18,6 @@ import java.util.Map;
 public class LuckyCharmTalisman extends CustomItem {
 
     public static final String ITEM_ID = "lucky_charm_talisman";
-    private static final String PASSIVE_ABILITY_ID = "lucky_charm_passive";
-
     public LuckyCharmTalisman(MMOCraftPlugin plugin) {
         super(plugin);
     }
@@ -42,7 +41,7 @@ public class LuckyCharmTalisman extends CustomItem {
     public List<String> getLore() {
         return List.of(
                 "&7Carry in your inventory to boost rare drop luck.",
-                "&7Commission reward from lush farming islands."
+                "&7Right click to beckon a Lucky Sprite companion."
         );
     }
 
@@ -68,12 +67,12 @@ public class LuckyCharmTalisman extends CustomItem {
     @Override
     public List<ItemAbilityDescriptor> getAbilityDescriptors() {
         return List.of(new ItemAbilityDescriptor(
-                PASSIVE_ABILITY_ID,
-                "Fortune's Favor",
-                "Passive",
-                "Passively increases your chance to find valuable loot.",
-                0.0,
-                0.0));
+                LuckySpriteSummonSkill.SKILL_ID,
+                LuckySpriteSummonSkill.DISPLAY_NAME,
+                "Right Click",
+                LuckySpriteSummonSkill.DESCRIPTION,
+                LuckySpriteSummonSkill.MANA_COST,
+                LuckySpriteSummonSkill.COOLDOWN_SECONDS));
     }
 
     @Override

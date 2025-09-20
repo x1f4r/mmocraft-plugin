@@ -17,6 +17,7 @@ import com.x1f4r.mmocraft.demo.skill.BerserkerRageSkill;
 import com.x1f4r.mmocraft.demo.skill.GaleForceDashSkill;
 import com.x1f4r.mmocraft.demo.skill.HarvestRallySkill;
 import com.x1f4r.mmocraft.demo.skill.InfernoBurstSkill;
+import com.x1f4r.mmocraft.demo.skill.LuckySpriteSummonSkill;
 import com.x1f4r.mmocraft.demo.skill.MinorHealSkill;
 import com.x1f4r.mmocraft.demo.skill.ProspectorPulseSkill;
 import com.x1f4r.mmocraft.demo.skill.StrongStrikeSkill;
@@ -272,6 +273,7 @@ public final class DemoContentModule {
         registerSkillIfAbsent(registry, new ProspectorPulseSkill(plugin));
         registerSkillIfAbsent(registry, new HarvestRallySkill(plugin));
         registerSkillIfAbsent(registry, new TidalSurgeSkill(plugin));
+        registerSkillIfAbsent(registry, new LuckySpriteSummonSkill(plugin));
     }
 
     private void registerSkillIfAbsent(SkillRegistryService registry, Skill skill) {

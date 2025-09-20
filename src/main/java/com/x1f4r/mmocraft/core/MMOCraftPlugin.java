@@ -24,6 +24,7 @@ import com.x1f4r.mmocraft.eventbus.events.PluginReloadedEvent;
 import com.x1f4r.mmocraft.diagnostics.PluginDiagnosticsService;
 import com.x1f4r.mmocraft.item.equipment.listeners.PlayerEquipmentListener;
 import com.x1f4r.mmocraft.item.equipment.service.PlayerEquipmentManager;
+import com.x1f4r.mmocraft.item.listeners.CustomItemAbilityListener;
 import com.x1f4r.mmocraft.item.service.BasicCustomItemRegistry;
 import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
 import com.x1f4r.mmocraft.loot.listeners.MobDeathLootListener;
@@ -33,6 +34,9 @@ import com.x1f4r.mmocraft.loot.registry.LootTableRegistry;
 import com.x1f4r.mmocraft.crafting.config.CraftingRecipeLoader;
 import com.x1f4r.mmocraft.demo.DemoContentModule;
 import com.x1f4r.mmocraft.demo.DemoContentSettings;
+import com.x1f4r.mmocraft.pet.listeners.CompanionPetListener;
+import com.x1f4r.mmocraft.pet.service.BasicCompanionPetService;
+import com.x1f4r.mmocraft.pet.service.CompanionPetService;
 import com.x1f4r.mmocraft.persistence.PersistenceService;
 import com.x1f4r.mmocraft.persistence.SqlitePersistenceService;
 import com.x1f4r.mmocraft.playerdata.BasicPlayerDataService;
@@ -42,6 +46,7 @@ import com.x1f4r.mmocraft.playerdata.model.PlayerProfile;
 import com.x1f4r.mmocraft.playerdata.model.Stat;
 import com.x1f4r.mmocraft.playerdata.runtime.PlayerRuntimeAttributeListener;
 import com.x1f4r.mmocraft.playerdata.runtime.PlayerRuntimeAttributeService;
+import com.x1f4r.mmocraft.playerdata.hud.PlayerHudService;
 import com.x1f4r.mmocraft.skill.service.BasicSkillRegistryService;
 import com.x1f4r.mmocraft.skill.service.SkillRegistryService;
 import com.x1f4r.mmocraft.statuseffect.manager.BasicStatusEffectManager;
@@ -59,6 +64,7 @@ import com.x1f4r.mmocraft.world.resourcegathering.listeners.ResourceNodeInteract
 import com.x1f4r.mmocraft.world.resourcegathering.service.ActiveNodeManager;
 import com.x1f4r.mmocraft.world.resourcegathering.service.BasicResourceNodeRegistryService;
 import com.x1f4r.mmocraft.world.resourcegathering.service.ResourceNodeRegistryService;
+import com.x1f4r.mmocraft.world.spawning.listeners.MobNameplateListener;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -97,12 +103,16 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private GameplayConfigService gameplayConfigService;
     private LootTableRegistry lootTableRegistry;
     private CraftingRecipeLoader craftingRecipeLoader;
+    private CompanionPetService companionPetService;
+    private PlayerHudService playerHudService;
     private DemoContentSettings demoSettings = DemoContentSettings.disabled();
     private DemoContentModule demoContentModule;
     private BukkitTask statusEffectTickTask;
     private BukkitTask customSpawningTask;
     private BukkitTask resourceNodeTickTask;
     private BukkitTask runtimeAttributeTask;
+    private BukkitTask companionPetTask;
+    private BukkitTask playerHudTask;
     private PluginDiagnosticsService diagnosticsService;
 
     @Override
@@ -164,12 +174,23 @@ public final class MMOCraftPlugin extends JavaPlugin {
             runtimeAttributeTask.cancel();
             loggingUtil.info("Runtime attribute sync scheduler cancelled.");
         }
+        if (playerHudTask != null && !playerHudTask.isCancelled()) {
+            playerHudTask.cancel();
+            loggingUtil.info("Player HUD scheduler cancelled.");
+        }
+        if (companionPetTask != null && !companionPetTask.isCancelled()) {
+            companionPetTask.cancel();
+            loggingUtil.info("Companion pet scheduler cancelled.");
+        }
 
         if (playerDataService instanceof BasicPlayerDataService) {
             ((BasicPlayerDataService) playerDataService).shutdown();
         }
         if (statusEffectManager instanceof BasicStatusEffectManager) {
             ((BasicStatusEffectManager) statusEffectManager).shutdown();
+        }
+        if (companionPetService instanceof BasicCompanionPetService basicCompanionPetService) {
+            basicCompanionPetService.shutdown();
         }
         if (zoneStatApplier != null) {
             zoneStatApplier.shutdown();
@@ -239,6 +260,8 @@ public final class MMOCraftPlugin extends JavaPlugin {
         playerEquipmentManager = new PlayerEquipmentManager(this, playerDataService, customItemRegistry, loggingUtil);
         skillRegistryService = new BasicSkillRegistryService(loggingUtil);
         playerRuntimeAttributeService = new PlayerRuntimeAttributeService(playerDataService, gameplayConfigService.getRuntimeStatConfig(), loggingUtil);
+        companionPetService = new BasicCompanionPetService(this, playerDataService, playerRuntimeAttributeService, loggingUtil);
+        playerHudService = new PlayerHudService(playerDataService, loggingUtil);
         statusEffectManager = new BasicStatusEffectManager(this, loggingUtil, playerDataService, playerRuntimeAttributeService);
         lootService = new BasicLootService(this, loggingUtil);
         recipeRegistryService = new BasicRecipeRegistryService(this, loggingUtil, customItemRegistry);
@@ -252,7 +275,6 @@ public final class MMOCraftPlugin extends JavaPlugin {
         lootTableRegistry.applyConfig(gameplayConfigService.getLootTablesConfig());
 
         craftingRecipeLoader = new CraftingRecipeLoader(recipeRegistryService, customItemRegistry, loggingUtil);
-        craftingRecipeLoader.applyConfig(gameplayConfigService.getCraftingConfig());
 
         resourceNodeRegistryService = new BasicResourceNodeRegistryService(loggingUtil);
         resourceNodeRepository = new ResourceNodeRepository(persistenceService, loggingUtil);
@@ -277,13 +299,16 @@ public final class MMOCraftPlugin extends JavaPlugin {
     }
 
     private void registerListeners() {
-        getServer().getPluginManager().registerEvents(new PlayerJoinQuitListener(playerDataService, loggingUtil), this);
+        getServer().getPluginManager().registerEvents(new PlayerJoinQuitListener(playerDataService, loggingUtil, playerHudService), this);
         getServer().getPluginManager().registerEvents(new PlayerRuntimeAttributeListener(playerRuntimeAttributeService, loggingUtil), this);
         getServer().getPluginManager().registerEvents(new PlayerZoneTrackerListener(zoneManager, loggingUtil, eventBusService), this);
-        getServer().getPluginManager().registerEvents(new PlayerCombatListener(damageCalculationService, playerDataService, loggingUtil, mobStatProvider), this);
+        getServer().getPluginManager().registerEvents(new PlayerCombatListener(damageCalculationService, playerDataService, loggingUtil, mobStatProvider, statusEffectManager, playerRuntimeAttributeService), this);
         getServer().getPluginManager().registerEvents(new PlayerEquipmentListener(this, playerEquipmentManager, loggingUtil), this);
         getServer().getPluginManager().registerEvents(new ResourceNodeInteractionListener(this, activeNodeManager, resourceNodeRegistryService, lootService, customItemRegistry, playerDataService, gameplayConfigService, loggingUtil), this);
         getServer().getPluginManager().registerEvents(new MobDeathLootListener(lootService, customItemRegistry, this, loggingUtil), this);
+        getServer().getPluginManager().registerEvents(new CustomItemAbilityListener(this), this);
+        getServer().getPluginManager().registerEvents(new CompanionPetListener(companionPetService, loggingUtil), this);
+        getServer().getPluginManager().registerEvents(new MobNameplateListener(mobStatProvider, loggingUtil), this);
         loggingUtil.info("Event listeners registered.");
     }
 
@@ -307,6 +332,18 @@ public final class MMOCraftPlugin extends JavaPlugin {
             if (playerRuntimeAttributeService != null) playerRuntimeAttributeService.updateAllPlayers();
         }, 20L, runtimeAttributeInterval);
         loggingUtil.info("Runtime attribute sync scheduler started.");
+
+        long playerHudInterval = 10L;
+        playerHudTask = getServer().getScheduler().runTaskTimer(this, () -> {
+            if (playerHudService != null) playerHudService.tick(playerHudInterval / 20.0);
+        }, 20L, playerHudInterval);
+        loggingUtil.info("Player HUD scheduler started.");
+
+        long companionPetInterval = 20L;
+        companionPetTask = getServer().getScheduler().runTaskTimer(this, () -> {
+            if (companionPetService != null) companionPetService.tick();
+        }, 40L, companionPetInterval);
+        loggingUtil.info("Companion pet scheduler started.");
 
         long spawningInterval = 200L;
         customSpawningTask = getServer().getScheduler().runTaskTimer(this, () -> {
@@ -355,6 +392,9 @@ public final class MMOCraftPlugin extends JavaPlugin {
     public GameplayConfigService getGameplayConfigService() { return gameplayConfigService; }
     public DemoContentSettings getDemoSettings() { return demoSettings; }
     public PluginDiagnosticsService getDiagnosticsService() { return diagnosticsService; }
+    public PlayerRuntimeAttributeService getPlayerRuntimeAttributeService() { return playerRuntimeAttributeService; }
+    public CompanionPetService getCompanionPetService() { return companionPetService; }
+    public PlayerHudService getPlayerHudService() { return playerHudService; }
 
     private DemoContentSettings applySetupPreferenceOverrides(DemoContentSettings baseSettings) {
         if (baseSettings == null) {
@@ -393,6 +433,13 @@ public final class MMOCraftPlugin extends JavaPlugin {
         return overridden;
     }
 
+    private void refreshCraftingRecipes() {
+        if (craftingRecipeLoader == null) {
+            return;
+        }
+        craftingRecipeLoader.applyConfig(gameplayConfigService.getCraftingConfig());
+    }
+
     public synchronized void applyDemoSettings(DemoContentSettings newSettings) {
         if (newSettings == null) {
             loggingUtil.warning("Attempted to apply null demo settings. Ignoring request.");
@@ -408,6 +455,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
         if (zoneManager != null) {
             zoneManager.loadZones();
         }
+        refreshCraftingRecipes();
     }
 
     public void reloadPluginConfig() {
@@ -418,9 +466,6 @@ public final class MMOCraftPlugin extends JavaPlugin {
             if (lootTableRegistry != null) {
                 lootTableRegistry.applyConfig(gameplayConfigService.getLootTablesConfig());
             }
-            if (craftingRecipeLoader != null) {
-                craftingRecipeLoader.applyConfig(gameplayConfigService.getCraftingConfig());
-            }
             if (demoContentModule != null) {
                 demoContentModule.updateConfig(gameplayConfigService.getDemoContentConfig());
             }
@@ -430,6 +475,9 @@ public final class MMOCraftPlugin extends JavaPlugin {
             if (playerRuntimeAttributeService != null) {
                 playerRuntimeAttributeService.updateRuntimeConfig(gameplayConfigService.getRuntimeStatConfig());
                 playerRuntimeAttributeService.updateAllPlayers();
+            }
+            if (playerHudService != null) {
+                playerHudService.clearAll();
             }
             DemoContentSettings reloadedSettings = DemoContentSettings.fromDemoConfig(
                     gameplayConfigService.getDemoContentConfig(), loggingUtil);

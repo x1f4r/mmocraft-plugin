@@ -1,19 +1,23 @@
 package com.x1f4r.mmocraft.combat.listeners;
 
 import com.x1f4r.mmocraft.combat.model.DamageInstance;
-import com.x1f4r.mmocraft.combat.model.DamageInstance;
 import com.x1f4r.mmocraft.combat.model.DamageType;
 import com.x1f4r.mmocraft.combat.service.DamageCalculationService;
-import com.x1f4r.mmocraft.combat.service.MobStatProvider; // Added
+import com.x1f4r.mmocraft.combat.service.MobStatProvider;
 import com.x1f4r.mmocraft.playerdata.PlayerDataService;
 import com.x1f4r.mmocraft.playerdata.model.PlayerProfile;
+import com.x1f4r.mmocraft.playerdata.runtime.PlayerRuntimeAttributeService;
+import com.x1f4r.mmocraft.statuseffect.manager.StatusEffectManager;
+import com.x1f4r.mmocraft.statuseffect.model.StatusEffectType;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Material;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
@@ -32,7 +36,11 @@ public class PlayerCombatListener implements Listener {
     private final DamageCalculationService damageCalculationService;
     private final PlayerDataService playerDataService;
     private final LoggingUtil logger;
-    private final MobStatProvider mobStatProvider; // Added
+    private final MobStatProvider mobStatProvider;
+    private final StatusEffectManager statusEffectManager;
+    private final PlayerRuntimeAttributeService runtimeAttributeService;
+
+    private static final ThreadLocal<Boolean> abilityGuard = ThreadLocal.withInitial(() -> false);
 
     private static final Map<Material, Double> VANILLA_WEAPON_BASE_DAMAGE = new HashMap<>();
     // private static final Map<org.bukkit.entity.EntityType, Double> MOB_BASE_DAMAGE = new HashMap<>(); // Replaced by MobStatProvider
@@ -58,12 +66,17 @@ public class PlayerCombatListener implements Listener {
 
 
     public PlayerCombatListener(DamageCalculationService damageCalculationService,
-                                PlayerDataService playerDataService, LoggingUtil logger,
-                                MobStatProvider mobStatProvider) { // Added mobStatProvider
+                                PlayerDataService playerDataService,
+                                LoggingUtil logger,
+                                MobStatProvider mobStatProvider,
+                                StatusEffectManager statusEffectManager,
+                                PlayerRuntimeAttributeService runtimeAttributeService) {
         this.damageCalculationService = damageCalculationService;
         this.playerDataService = playerDataService;
         this.logger = logger;
-        this.mobStatProvider = mobStatProvider; // Added
+        this.mobStatProvider = mobStatProvider;
+        this.statusEffectManager = statusEffectManager;
+        this.runtimeAttributeService = runtimeAttributeService;
         logger.debug("PlayerCombatListener initialized with MobStatProvider.");
     }
 
@@ -128,12 +141,18 @@ public class PlayerCombatListener implements Listener {
 
         event.setDamage(damageInstance.finalDamage());
 
-        // Logging and PlayerProfile updates (like health reduction)
-        String attackerName = (actualAttacker != null) ? actualAttacker.getName() : (damager != null ? damager.getType().toString() : "Unknown Attacker");
-        String victimName = victim.getName();
+        if (actualAttacker instanceof Player attackerPlayer) {
+            String feedback = String.format("&f%s &7- &c%.1f", describeEntity(victim), damageInstance.finalDamage());
+            attackerPlayer.sendActionBar(LegacyComponentSerializer.legacyAmpersand().deserialize(feedback));
+        }
+
+        handleBerserkEffects(actualAttacker, (LivingEntity) victim, damageInstance);
+
+        String attackerName = describeEntity(actualAttacker != null ? actualAttacker : damager);
+        String victimName = describeEntity(victim);
 
         if (damageInstance.evaded()) {
-            logger.info(StringUtil.colorize(attackerName + "'s attack on " + victimName + " was &eEVADED&f."));
+            logger.finer(StringUtil.colorize(attackerName + "'s attack on " + victimName + " was &eEVADED&f."));
             if (victim instanceof Player && damageInstance.victimProfile() != null) {
                  ((Player) victim).sendActionBar(LegacyComponentSerializer.legacyAmpersand().deserialize("&7&oEvaded attack from " + attackerName));
             }
@@ -146,7 +165,7 @@ public class PlayerCombatListener implements Listener {
                     attackerName, victimName, damageInstance.finalDamage(),
                     damageInstance.type().name(), critMessage,
                     damageInstance.baseDamage(), damageInstance.mitigationDetails());
-            logger.info(StringUtil.colorize(message));
+            logger.finest(StringUtil.colorize(message));
 
             // Update PlayerProfile health if the victim is a player and took damage
             if (victim instanceof Player victimPlayer && damageInstance.finalDamage() > 0 && !damageInstance.evaded()) {
@@ -158,7 +177,10 @@ public class PlayerCombatListener implements Listener {
                     // Note: This assumes that Bukkit's health and our profile health are 1:1.
                     // If PlayerProfile has a different health scale, this logic needs adjustment.
                     victimProfile.takeDamage(damageInstance.finalDamage());
-                    logger.fine("Updated PlayerProfile health for " + victimName + " after taking " + String.format("%.2f", damageInstance.finalDamage()) + " damage. New profile health: " + victimProfile.getCurrentHealth());
+                    logger.finest("Updated PlayerProfile health for " + victimName + " after taking " + String.format("%.2f", damageInstance.finalDamage()) + " damage. New profile health: " + victimProfile.getCurrentHealth());
+                    if (runtimeAttributeService != null) {
+                        runtimeAttributeService.syncPlayer(victimPlayer);
+                    }
 
                     // If victimProfile.getCurrentHealth() <= 0, you might trigger a custom death event or logic here
                     // For now, Bukkit will handle the death event.
@@ -167,5 +189,75 @@ public class PlayerCombatListener implements Listener {
         }
         // Future: if finalDamage > 0 and attacker is player, apply on-hit effects from equipment/buffs.
         // Future: if attacker used a skill for this attack, skill's onHit method could be called here.
+    }
+
+    private void handleBerserkEffects(Entity attacker, LivingEntity victim, DamageInstance damageInstance) {
+        if (!(attacker instanceof Player player)) {
+            return;
+        }
+        if (statusEffectManager == null || !statusEffectManager.hasEffect(player, StatusEffectType.BERSERK)) {
+            return;
+        }
+        if (damageInstance.finalDamage() <= 0 || damageInstance.evaded()) {
+            return;
+        }
+        PlayerProfile profile = damageInstance.attackerProfile();
+        if (profile == null) {
+            profile = playerDataService.getPlayerProfile(player.getUniqueId());
+        }
+        if (profile == null) {
+            return;
+        }
+
+        double lifesteal = Math.max(0.0, damageInstance.finalDamage() * 0.25);
+        if (lifesteal > 0) {
+            profile.heal(Math.round(lifesteal));
+            if (runtimeAttributeService != null) {
+                runtimeAttributeService.syncPlayer(player);
+            }
+        }
+
+        if (abilityGuard.get()) {
+            return;
+        }
+        abilityGuard.set(true);
+        try {
+            for (Entity nearby : victim.getNearbyEntities(3.0, 1.5, 3.0)) {
+                if (!(nearby instanceof LivingEntity living) || living.equals(victim) || living.equals(player)) {
+                    continue;
+                }
+                DamageInstance cleave = damageCalculationService.calculateDamage(player, living,
+                        damageInstance.finalDamage() * 0.35, DamageType.PHYSICAL);
+                if (cleave.finalDamage() <= 0) {
+                    continue;
+                }
+                living.damage(cleave.finalDamage(), player);
+            }
+        } finally {
+            abilityGuard.set(false);
+        }
+    }
+
+    private String describeEntity(Entity entity) {
+        if (entity == null) {
+            return "Unknown";
+        }
+        if (entity instanceof Player player) {
+            return player.getName();
+        }
+        String name = entity.getName();
+        if (name != null && !name.isBlank()) {
+            return name;
+        }
+        EntityType type = entity.getType();
+        String raw = type.name().toLowerCase().replace('_', ' ');
+        StringBuilder builder = new StringBuilder();
+        for (String part : raw.split(" ")) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            builder.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1)).append(' ');
+        }
+        return builder.toString().trim();
     }
 }
