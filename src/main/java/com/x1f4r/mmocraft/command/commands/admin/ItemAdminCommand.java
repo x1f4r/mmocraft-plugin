@@ -18,6 +18,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -53,18 +54,31 @@ public class ItemAdminCommand extends AbstractPluginCommand {
                 }
 
                 if (args.length == 0) {
-                    return null; // default player completion
+                    return Bukkit.getOnlinePlayers().stream()
+                            .map(Player::getName)
+                            .sorted(String.CASE_INSENSITIVE_ORDER)
+                            .collect(Collectors.toList());
                 }
 
                 if (args.length == 1) {
-                    String inputItemId = args[0].toLowerCase(Locale.ROOT);
-                    return customItemRegistry.getAllItems().stream()
-                            .map(CustomItem::getItemId)
-                            .filter(id -> id.toLowerCase(Locale.ROOT).startsWith(inputItemId))
+                    String partialPlayer = args[0].toLowerCase(Locale.ROOT);
+                    return Bukkit.getOnlinePlayers().stream()
+                            .map(Player::getName)
+                            .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(partialPlayer))
+                            .sorted(String.CASE_INSENSITIVE_ORDER)
                             .collect(Collectors.toList());
                 }
 
                 if (args.length == 2) {
+                    String inputItemId = args[1].toLowerCase(Locale.ROOT);
+                    return customItemRegistry.getAllItems().stream()
+                            .map(CustomItem::getItemId)
+                            .filter(id -> id.toLowerCase(Locale.ROOT).startsWith(inputItemId))
+                            .sorted()
+                            .collect(Collectors.toList());
+                }
+
+                if (args.length == 3) {
                     return List.of("1", "16", "32", "64");
                 }
 
@@ -106,7 +120,24 @@ public class ItemAdminCommand extends AbstractPluginCommand {
 
     @Override
     public boolean onCommand(CommandSender sender, String[] args) {
-        // Base /mmocadm item command - show help for its subcommands
+        if (permission != null && !permission.isEmpty() && !sender.hasPermission(permission)) {
+            sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+            return true;
+        }
+
+        if (args.length == 0) {
+            sendHelp(sender);
+            return true;
+        }
+
+        String subCommandName = args[0].toLowerCase(Locale.ROOT);
+        CommandExecutable executable = subCommands.get(subCommandName);
+        if (executable != null) {
+            String[] subArgs = Arrays.copyOfRange(args, 1, args.length);
+            return executable.onCommand(sender, subArgs);
+        }
+
+        sender.sendMessage(Component.text("Unknown item admin subcommand '" + args[0] + "'.", NamedTextColor.RED));
         sendHelp(sender);
         return true;
     }
@@ -340,6 +371,10 @@ public class ItemAdminCommand extends AbstractPluginCommand {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, String[] args) {
+        if (permission != null && !permission.isEmpty() && !sender.hasPermission(permission)) {
+            return Collections.emptyList();
+        }
+
         if (args.length == 0) {
             return new ArrayList<>(subCommands.keySet());
         }
@@ -350,6 +385,12 @@ public class ItemAdminCommand extends AbstractPluginCommand {
                     .filter(name -> name.startsWith(partial))
                     .sorted()
                     .collect(Collectors.toList());
+        }
+
+        CommandExecutable sub = subCommands.get(args[0].toLowerCase(Locale.ROOT));
+        if (sub != null) {
+            String[] subArgs = Arrays.copyOfRange(args, 1, args.length);
+            return sub.onTabComplete(sender, subArgs);
         }
 
         return Collections.emptyList();

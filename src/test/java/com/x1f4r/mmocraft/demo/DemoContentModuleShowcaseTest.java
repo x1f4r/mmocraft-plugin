@@ -17,6 +17,7 @@ import com.x1f4r.mmocraft.demo.skill.BerserkerRageSkill;
 import com.x1f4r.mmocraft.demo.skill.GaleForceDashSkill;
 import com.x1f4r.mmocraft.demo.skill.HarvestRallySkill;
 import com.x1f4r.mmocraft.demo.skill.InfernoBurstSkill;
+import com.x1f4r.mmocraft.demo.skill.LuckySpriteSummonSkill;
 import com.x1f4r.mmocraft.demo.skill.ProspectorPulseSkill;
 import com.x1f4r.mmocraft.demo.skill.TidalSurgeSkill;
 import com.x1f4r.mmocraft.item.model.CustomItem;
@@ -182,6 +183,7 @@ class DemoContentModuleShowcaseTest {
                 GaleForceDashSkill.SKILL_ID,
                 BerserkerRageSkill.SKILL_ID,
                 ProspectorPulseSkill.SKILL_ID,
+                LuckySpriteSummonSkill.SKILL_ID,
                 HarvestRallySkill.SKILL_ID,
                 TidalSurgeSkill.SKILL_ID
         );
