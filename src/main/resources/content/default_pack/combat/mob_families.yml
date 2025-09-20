@@ -1,0 +1,25 @@
+families:
+  - id: default:emberling
+    display: "Emberling"
+    base-entity: BLAZE
+    stats:
+      HEALTH: 400
+      STRENGTH: 35
+      DEFENSE: 20
+    abilities:
+      - ember_attunement
+      - ember_burst
+    loot-tables:
+      - default:emberling
+  - id: default:sentinel
+    display: "Sky Sentinel"
+    base-entity: ARMORED_ZOMBIE
+    stats:
+      HEALTH: 650
+      DEFENSE: 60
+      TRUE_DEFENSE: 20
+    abilities:
+      - sentinel_poise
+      - guardian_wall
+    loot-tables:
+      - default:sentinel

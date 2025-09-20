@@ -1,0 +1,9 @@
+packs:
+  - id: default
+    name: Default Content Pack
+    version: 0.1.0
+    description: "Bundled reference content demonstrating the MMOCraft data model."
+    path: default_pack
+    enabled: true
+    priority: 0
+    requires: []

@@ -1,0 +1,19 @@
+instances:
+  - id: default:ember_sanctum
+    type: dungeon
+    name: "Ember Sanctum"
+    min-players: 1
+    max-players: 5
+    entry:
+      world: hub
+      x: 45.5
+      y: 75
+      z: -18.2
+    scripts:
+      on-enter:
+        - type: broadcast
+          message: "&6You feel an oppressive heat as you enter the sanctum."
+      on-complete:
+        - type: reward
+          currency:
+            ember_shard: 40

@@ -1,0 +1,30 @@
+metadata:
+  profession: mining
+nodes:
+  - id: default:copper_node
+    display: "Copper Seam"
+    block: COPPER_ORE
+    tier: 1
+    respawn-seconds: 45
+    drops:
+      - type: vanilla
+        material: RAW_COPPER
+        amount: 2-4
+      - type: custom
+        item: default:prospector_pickaxe
+        chance: 0.02
+  - id: default:magma_geode
+    display: "Magma Geode"
+    block: MAGMA_BLOCK
+    tier: 3
+    respawn-seconds: 180
+    conditions:
+      biome:
+        - BASALT_DELTAS
+    drops:
+      - type: vanilla
+        material: BLAZE_ROD
+        amount: 1-2
+      - type: currency
+        currency: ember_shard
+        amount: 3-7

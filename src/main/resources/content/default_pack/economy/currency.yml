@@ -1,0 +1,17 @@
+currencies:
+  - id: coins
+    display: "Coins"
+    symbol: "Ⓒ"
+    description: "Primary currency earned through all activities."
+  - id: ember_shard
+    display: "Ember Shard"
+    symbol: "✦"
+    description: "Dropped by fiery foes and used to unlock heatforged gear."
+  - id: guild_token
+    display: "Guild Token"
+    symbol: "⚔"
+    description: "Rewarded for completing daily guild quests."
+  - id: druidic_spore
+    display: "Druidic Spore"
+    symbol: "✿"
+    description: "Rare essence found while foraging in enchanted groves."

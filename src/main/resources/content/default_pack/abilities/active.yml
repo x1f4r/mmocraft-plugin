@@ -1,0 +1,28 @@
+metadata:
+  type: active
+  pack: default
+abilities:
+  - id: ember_burst
+    name: "Ember Burst"
+    cooldown: 12
+    mana-cost: 60
+    description: "Unleash a cone of embers that applies burning damage."
+    handler: demo:inferno_burst
+  - id: gale_dash
+    name: "Gale Dash"
+    cooldown: 8
+    mana-cost: 40
+    description: "Dash forward and knock back enemies along the path."
+    handler: demo:gale_force_dash
+  - id: timberwhirl
+    name: "Timberwhirl"
+    cooldown: 18
+    mana-cost: 50
+    description: "Spin violently, chopping nearby trees for bonus drops."
+    handler: demo:harvest_rally
+  - id: guardian_wall
+    name: "Guardian Wall"
+    cooldown: 30
+    mana-cost: 80
+    description: "Project a damage-absorbing barrier for nearby allies."
+    handler: demo:guardian_wall

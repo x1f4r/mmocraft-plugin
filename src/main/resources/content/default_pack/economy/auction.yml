@@ -1,0 +1,9 @@
+auction-house:
+  enabled: true
+  tax-percent: 5.0
+  listing-duration-minutes: 180
+  categories:
+    - weapons
+    - armor
+    - tools
+    - consumables

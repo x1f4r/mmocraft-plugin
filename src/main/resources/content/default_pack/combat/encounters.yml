@@ -1,0 +1,32 @@
+encounters:
+  - id: default:ember_pit
+    name: "Ember Pit"
+    zone: ember_sanctum
+    mobs:
+      - family: default:emberling
+        count: 6
+        respawn-seconds: 45
+    boss:
+      id: default:ember_titan
+      display: "Ember Titan"
+      base-entity: BLAZE
+      stats:
+        HEALTH: 2400
+        STRENGTH: 90
+        DEFENSE: 50
+      phases:
+        - id: ignite
+          trigger: health-below-75
+          actions:
+            - type: broadcast
+              message: "&cThe Ember Titan ignites the arena!"
+            - type: spawn
+              family: default:emberling
+              count: 3
+        - id: collapse
+          trigger: health-below-25
+          actions:
+            - type: ability
+              ability: guardian_wall
+            - type: enraged
+              multiplier: 1.5

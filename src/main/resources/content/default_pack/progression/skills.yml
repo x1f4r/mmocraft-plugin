@@ -1,0 +1,32 @@
+skills:
+  - id: combat
+    display: "Combat"
+    description: "Increases damage dealt to hostile mobs."
+    xp-curve: linear
+    rewards:
+      "1":
+        stats:
+          STRENGTH: 1
+      "10":
+        stats:
+          STRENGTH: 15
+          CRITICAL_DAMAGE: 10
+      "25":
+        stats:
+          STRENGTH: 40
+          ABILITY_POWER: 25
+  - id: mining
+    display: "Mining"
+    description: "Grants Mining Fortune and unlocks higher tier veins."
+    xp-curve: quadratic
+    rewards:
+      "5":
+        stats:
+          MINING_FORTUNE: 25
+      "15":
+        stats:
+          MINING_SPEED: 40
+      "25":
+        stats:
+          MINING_SPEED: 65
+          MINING_FORTUNE: 80

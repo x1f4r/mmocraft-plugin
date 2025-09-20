@@ -1,0 +1,8 @@
+messages:
+  crafting:
+    title: "Arcane Workbench"
+    search-placeholder: "Search recipes..."
+    locked: "&cUnlock this recipe to craft it."
+  gathering:
+    mining-xp: "&b+{amount} Mining XP"
+    farming-xp: "&a+{amount} Farming XP"

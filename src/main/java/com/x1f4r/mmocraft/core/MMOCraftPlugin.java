@@ -15,6 +15,10 @@ import com.x1f4r.mmocraft.config.BasicConfigService;
 import com.x1f4r.mmocraft.config.ConfigService;
 import com.x1f4r.mmocraft.config.gameplay.GameplayConfigIssue;
 import com.x1f4r.mmocraft.config.gameplay.GameplayConfigService;
+import com.x1f4r.mmocraft.content.BasicContentPackService;
+import com.x1f4r.mmocraft.content.ContentIndex;
+import com.x1f4r.mmocraft.content.ContentPackIssue;
+import com.x1f4r.mmocraft.content.ContentPackService;
 import com.x1f4r.mmocraft.crafting.service.BasicRecipeRegistryService;
 import com.x1f4r.mmocraft.crafting.service.RecipeRegistryService;
 import com.x1f4r.mmocraft.crafting.ui.CraftingUIManager;
@@ -73,6 +77,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 
@@ -114,6 +119,8 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private BukkitTask companionPetTask;
     private BukkitTask playerHudTask;
     private PluginDiagnosticsService diagnosticsService;
+    private ContentPackService contentPackService;
+    private ContentIndex contentIndex = ContentIndex.empty();
 
     @Override
     public void onEnable() {
@@ -127,6 +134,16 @@ public final class MMOCraftPlugin extends JavaPlugin {
                 resource -> getResource("config/" + resource),
                 loggingUtil);
         PlayerProfile.setStatScalingConfig(gameplayConfigService.getStatScalingConfig());
+
+        contentPackService = new BasicContentPackService(
+                getDataFolder().toPath().resolve("content"),
+                resource -> getResource("content/" + resource),
+                loggingUtil);
+        contentIndex = contentPackService.reloadPacks();
+        if (logContentPackIssues("startup")) {
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
 
         DemoContentSettings configuredSettings = DemoContentSettings.fromDemoConfig(
                 gameplayConfigService.getDemoContentConfig(), loggingUtil);
@@ -253,6 +270,27 @@ public final class MMOCraftPlugin extends JavaPlugin {
         }
     }
 
+    private boolean logContentPackIssues(String phase) {
+        if (contentPackService == null) {
+            return false;
+        }
+        List<ContentPackIssue> issues = contentPackService.getIssues();
+        if (issues.isEmpty()) {
+            loggingUtil.info("Content pack " + phase + " completed with no issues. Loaded packs: "
+                    + contentPackService.getLoadedPacks().size());
+            return false;
+        }
+        long errorCount = issues.stream().filter(ContentPackIssue::isError).count();
+        if (errorCount > 0) {
+            loggingUtil.severe("Content pack " + phase + " encountered " + errorCount
+                    + " blocking issue(s). Resolve them before continuing.");
+            return true;
+        }
+        loggingUtil.warning("Content pack " + phase + " completed with " + issues.size()
+                + " warning(s). Review the log for details.");
+        return false;
+    }
+
     private void initGameplayServices() {
         customItemRegistry = new BasicCustomItemRegistry(this, loggingUtil);
         mobStatProvider = new DefaultMobStatProvider();
@@ -290,6 +328,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
                 activeNodeManager,
                 resourceNodeRegistryService,
                 gameplayConfigService,
+                contentPackService,
                 persistenceService,
                 recipeRegistryService,
                 this::getDemoSettings,
@@ -392,6 +431,8 @@ public final class MMOCraftPlugin extends JavaPlugin {
     public GameplayConfigService getGameplayConfigService() { return gameplayConfigService; }
     public DemoContentSettings getDemoSettings() { return demoSettings; }
     public PluginDiagnosticsService getDiagnosticsService() { return diagnosticsService; }
+    public ContentPackService getContentPackService() { return contentPackService; }
+    public ContentIndex getContentIndex() { return contentIndex; }
     public PlayerRuntimeAttributeService getPlayerRuntimeAttributeService() { return playerRuntimeAttributeService; }
     public CompanionPetService getCompanionPetService() { return companionPetService; }
     public PlayerHudService getPlayerHudService() { return playerHudService; }
@@ -462,6 +503,13 @@ public final class MMOCraftPlugin extends JavaPlugin {
         if (configService != null) {
             configService.reloadConfig();
             gameplayConfigService.reload();
+            if (contentPackService != null) {
+                contentIndex = contentPackService.reloadPacks();
+                boolean blockingContentIssues = logContentPackIssues("reload");
+                if (blockingContentIssues) {
+                    loggingUtil.severe("Content pack reload reported blocking issues. Some content may be unavailable until they are resolved.");
+                }
+            }
             PlayerProfile.setStatScalingConfig(gameplayConfigService.getStatScalingConfig());
             if (lootTableRegistry != null) {
                 lootTableRegistry.applyConfig(gameplayConfigService.getLootTablesConfig());

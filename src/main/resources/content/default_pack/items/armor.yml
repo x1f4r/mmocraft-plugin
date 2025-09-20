@@ -1,0 +1,55 @@
+metadata:
+  category: armor
+  pack: default
+items:
+  - id: default:sentinel_helm
+    name: "&9Sentinel Helm"
+    material: DIAMOND_HELMET
+    rarity: RARE
+    stats:
+      HEALTH: 60
+      DEFENSE: 30
+    set: sentinel_guard
+    lore:
+      - "&7An enchanted helm worn by city sentinels."
+  - id: default:sentinel_chestplate
+    name: "&9Sentinel Chestplate"
+    material: DIAMOND_CHESTPLATE
+    rarity: RARE
+    stats:
+      HEALTH: 90
+      DEFENSE: 45
+    set: sentinel_guard
+    lore:
+      - "&7Provides sturdy protection during patrols."
+  - id: default:sentinel_leggings
+    name: "&9Sentinel Leggings"
+    material: DIAMOND_LEGGINGS
+    rarity: RARE
+    stats:
+      HEALTH: 70
+      DEFENSE: 40
+    set: sentinel_guard
+  - id: default:sentinel_boots
+    name: "&9Sentinel Boots"
+    material: DIAMOND_BOOTS
+    rarity: RARE
+    stats:
+      HEALTH: 50
+      DEFENSE: 25
+    set: sentinel_guard
+    lore:
+      - "&7Boots designed for swift response in the capital."
+sets:
+  sentinel_guard:
+    bonus:
+      pieces:
+        "2":
+          stats:
+            DEFENSE: 15
+        "4":
+          stats:
+            HEALTH: 120
+            TRUE_DEFENSE: 15
+          abilities:
+            - guardian_wall

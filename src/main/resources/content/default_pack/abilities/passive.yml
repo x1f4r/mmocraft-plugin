@@ -1,0 +1,12 @@
+metadata:
+  type: passive
+  pack: default
+abilities:
+  - id: ember_attunement
+    name: "Ember Attunement"
+    description: "Increase fire damage dealt by 12%."
+    handler: demo:ember_attunement
+  - id: sentinel_poise
+    name: "Sentinel Poise"
+    description: "Grants +10 Defense while standing still."
+    handler: demo:sentinel_poise

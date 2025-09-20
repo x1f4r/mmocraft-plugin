@@ -1,6 +1,9 @@
 package com.x1f4r.mmocraft.diagnostics;
 
 import com.x1f4r.mmocraft.combat.listeners.PlayerCombatListener;
+import com.x1f4r.mmocraft.content.ContentPack;
+import com.x1f4r.mmocraft.content.ContentPackIssue;
+import com.x1f4r.mmocraft.content.ContentPackService;
 import com.x1f4r.mmocraft.config.gameplay.CraftingConfig;
 import com.x1f4r.mmocraft.config.gameplay.DemoContentConfig;
 import com.x1f4r.mmocraft.config.gameplay.GameplayConfigIssue;
@@ -41,6 +44,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -82,6 +86,8 @@ class PluginDiagnosticsServiceTest {
     private RecipeRegistryService recipeRegistryService;
     @Mock
     private Plugin plugin;
+    @Mock
+    private ContentPackService contentPackService;
 
     private PluginDiagnosticsService diagnosticsService;
     private DemoContentSettings demoSettings;
@@ -114,6 +120,8 @@ class PluginDiagnosticsServiceTest {
         lenient().when(activeNodeManager.getAllActiveNodesView()).thenReturn(Collections.emptyMap());
         lenient().when(resourceNodeRegistryService.getAllNodeTypes()).thenReturn(Collections.emptyList());
         lenient().when(recipeRegistryService.getAllRecipes()).thenReturn(Collections.emptyList());
+        lenient().when(contentPackService.getLoadedPacks()).thenReturn(defaultContentPacks());
+        lenient().when(contentPackService.getIssues()).thenReturn(Collections.emptyList());
 
         demoSettings = DemoContentSettings.disabled();
 
@@ -124,6 +132,7 @@ class PluginDiagnosticsServiceTest {
                 activeNodeManager,
                 resourceNodeRegistryService,
                 gameplayConfigService,
+                contentPackService,
                 persistenceService,
                 recipeRegistryService,
                 () -> demoSettings,
@@ -141,6 +150,17 @@ class PluginDiagnosticsServiceTest {
         assertTrue(entries.stream().anyMatch(entry ->
                 entry.getSeverity() == PluginDiagnosticsService.Severity.WARNING
                         && entry.getMessage().contains("No custom items")));
+    }
+
+    @Test
+    void runDiagnostics_whenNoContentPacks_reportsError() {
+        when(contentPackService.getLoadedPacks()).thenReturn(Collections.emptyList());
+
+        List<PluginDiagnosticsService.DiagnosticEntry> entries = diagnosticsService.runDiagnostics();
+
+        assertTrue(entries.stream().anyMatch(entry ->
+                entry.getSeverity() == PluginDiagnosticsService.Severity.ERROR
+                        && entry.getMessage().contains("No content packs")));
     }
 
     @Test
@@ -215,6 +235,18 @@ class PluginDiagnosticsServiceTest {
     }
 
     @Test
+    void runDiagnostics_whenContentPackIssuesPresent_includesEntries() {
+        ContentPackIssue warning = ContentPackIssue.warning("Missing pack metadata", "default pack pack.yml not found");
+        when(contentPackService.getIssues()).thenReturn(List.of(warning));
+
+        List<PluginDiagnosticsService.DiagnosticEntry> entries = diagnosticsService.runDiagnostics();
+
+        assertTrue(entries.stream().anyMatch(entry ->
+                entry.getSeverity() == PluginDiagnosticsService.Severity.WARNING
+                        && entry.getMessage().contains("Missing pack metadata")));
+    }
+
+    @Test
     void runDiagnostics_whenRecipeUsesMissingCustomItem_reportsError() {
         CustomRecipeIngredient missing = new CustomRecipeIngredient(
                 CustomRecipeIngredient.IngredientType.CUSTOM_ITEM,
@@ -252,6 +284,18 @@ class PluginDiagnosticsServiceTest {
 
     private Collection<CustomItem> defaultItems() {
         return List.of(mock(CustomItem.class));
+    }
+
+    private List<ContentPack> defaultContentPacks() {
+        return List.of(new ContentPack(
+                "default",
+                "Default Pack",
+                "0.1.0",
+                0,
+                Paths.get("content/default_pack"),
+                List.of(),
+                ""
+        ));
     }
 
     @SafeVarargs

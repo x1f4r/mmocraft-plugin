@@ -1,0 +1,23 @@
+vendors:
+  - id: default:blacksmith
+    name: "Dorrin the Blacksmith"
+    location:
+      world: hub
+      x: 12.5
+      y: 72
+      z: -4.5
+      yaw: 90
+    stock:
+      - item: default:training_blade
+        price:
+          currency: coins
+          amount: 250
+      - item: default:prospector_pickaxe
+        price:
+          currency: coins
+          amount: 1250
+      - item: default:mana_tonic
+        price:
+          currency: coins
+          amount: 120
+        restock-seconds: 300

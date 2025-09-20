@@ -1,0 +1,44 @@
+# Custom and vanilla recipe definitions bundled with the default pack.
+[[recipe]]
+id = "default:ember_staff"
+type = "infusion"
+output = "default:ember_staff"
+station = "arcane_workbench"
+permission = "mmocraft.craft.ember"
+[[recipe.ingredients]]
+kind = "vanilla"
+item = "BLAZE_ROD"
+amount = 1
+[[recipe.ingredients]]
+kind = "vanilla"
+item = "BLAZE_POWDER"
+amount = 8
+[[recipe.ingredients]]
+kind = "vanilla"
+item = "GHAST_TEAR"
+amount = 1
+
+[[recipe]]
+id = "default:sentinel_boots"
+type = "shaped"
+pattern = ["D D", "S S"]
+output = "default:sentinel_boots"
+[[recipe.ingredients]]
+kind = "vanilla"
+item = "DIAMOND"
+amount = 4
+[[recipe.ingredients]]
+kind = "vanilla"
+item = "STICK"
+amount = 2
+
+[[recipe]]
+id = "vanilla:stick"
+type = "vanilla"
+pattern = ["p", "p"]
+output = "STICK"
+amount = 4
+[[recipe.ingredients]]
+kind = "vanilla"
+item = "PLANKS"
+amount = 1
