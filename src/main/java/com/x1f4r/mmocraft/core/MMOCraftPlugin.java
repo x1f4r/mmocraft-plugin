@@ -40,6 +40,8 @@ import com.x1f4r.mmocraft.playerdata.PlayerDataService;
 import com.x1f4r.mmocraft.playerdata.listeners.PlayerJoinQuitListener;
 import com.x1f4r.mmocraft.playerdata.model.PlayerProfile;
 import com.x1f4r.mmocraft.playerdata.model.Stat;
+import com.x1f4r.mmocraft.playerdata.runtime.PlayerRuntimeAttributeListener;
+import com.x1f4r.mmocraft.playerdata.runtime.PlayerRuntimeAttributeService;
 import com.x1f4r.mmocraft.skill.service.BasicSkillRegistryService;
 import com.x1f4r.mmocraft.skill.service.SkillRegistryService;
 import com.x1f4r.mmocraft.statuseffect.manager.BasicStatusEffectManager;
@@ -49,6 +51,7 @@ import com.x1f4r.mmocraft.world.resourcegathering.persistence.ResourceNodeReposi
 import com.x1f4r.mmocraft.world.spawning.service.BasicCustomSpawningService;
 import com.x1f4r.mmocraft.world.spawning.service.CustomSpawningService;
 import com.x1f4r.mmocraft.world.zone.listeners.PlayerZoneTrackerListener;
+import com.x1f4r.mmocraft.world.zone.runtime.ZoneStatApplier;
 import com.x1f4r.mmocraft.world.zone.service.BasicZoneManager;
 import com.x1f4r.mmocraft.world.zone.service.ZoneManager;
 import com.x1f4r.mmocraft.world.resourcegathering.listeners.ResourceNodeInteractionListener;
@@ -76,6 +79,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private DamageCalculationService damageCalculationService;
     private SkillRegistryService skillRegistryService;
     private StatusEffectManager statusEffectManager;
+    private PlayerRuntimeAttributeService playerRuntimeAttributeService;
     private MobStatProvider mobStatProvider;
     private CustomItemRegistry customItemRegistry;
     private PlayerEquipmentManager playerEquipmentManager;
@@ -84,6 +88,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private CraftingUIManager craftingUIManager;
     private CustomSpawningService customSpawningService;
     private ZoneManager zoneManager;
+    private ZoneStatApplier zoneStatApplier;
     private ResourceNodeRegistryService resourceNodeRegistryService;
     private ResourceNodeRepository resourceNodeRepository;
     private ActiveNodeManager activeNodeManager;
@@ -96,6 +101,7 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private BukkitTask statusEffectTickTask;
     private BukkitTask customSpawningTask;
     private BukkitTask resourceNodeTickTask;
+    private BukkitTask runtimeAttributeTask;
     private PluginDiagnosticsService diagnosticsService;
 
     @Override
@@ -153,12 +159,19 @@ public final class MMOCraftPlugin extends JavaPlugin {
             statusEffectTickTask.cancel();
             loggingUtil.info("StatusEffect tick scheduler cancelled.");
         }
+        if (runtimeAttributeTask != null && !runtimeAttributeTask.isCancelled()) {
+            runtimeAttributeTask.cancel();
+            loggingUtil.info("Runtime attribute sync scheduler cancelled.");
+        }
 
         if (playerDataService instanceof BasicPlayerDataService) {
             ((BasicPlayerDataService) playerDataService).shutdown();
         }
         if (statusEffectManager instanceof BasicStatusEffectManager) {
             ((BasicStatusEffectManager) statusEffectManager).shutdown();
+        }
+        if (zoneStatApplier != null) {
+            zoneStatApplier.shutdown();
         }
         if (customSpawningService instanceof BasicCustomSpawningService) {
             ((BasicCustomSpawningService) customSpawningService).shutdown();
@@ -221,15 +234,18 @@ public final class MMOCraftPlugin extends JavaPlugin {
     private void initGameplayServices() {
         customItemRegistry = new BasicCustomItemRegistry(this, loggingUtil);
         mobStatProvider = new DefaultMobStatProvider();
-        damageCalculationService = new BasicDamageCalculationService(playerDataService, loggingUtil, mobStatProvider);
+        damageCalculationService = new BasicDamageCalculationService(playerDataService, loggingUtil, mobStatProvider, gameplayConfigService);
         playerEquipmentManager = new PlayerEquipmentManager(this, playerDataService, customItemRegistry, loggingUtil);
         skillRegistryService = new BasicSkillRegistryService(loggingUtil);
-        statusEffectManager = new BasicStatusEffectManager(this, loggingUtil, playerDataService);
+        playerRuntimeAttributeService = new PlayerRuntimeAttributeService(playerDataService, gameplayConfigService.getRuntimeStatConfig(), loggingUtil);
+        statusEffectManager = new BasicStatusEffectManager(this, loggingUtil, playerDataService, playerRuntimeAttributeService);
         lootService = new BasicLootService(this, loggingUtil);
         recipeRegistryService = new BasicRecipeRegistryService(this, loggingUtil, customItemRegistry);
         craftingUIManager = new CraftingUIManager(this, recipeRegistryService, playerDataService, customItemRegistry, loggingUtil);
-        customSpawningService = new BasicCustomSpawningService(this, loggingUtil, mobStatProvider, lootService, customItemRegistry);
+        customSpawningService = new BasicCustomSpawningService(this, loggingUtil, mobStatProvider, lootService, customItemRegistry, playerDataService, gameplayConfigService);
         zoneManager = new BasicZoneManager(this, loggingUtil, eventBusService, demoSettings.zonesEnabled());
+        zoneStatApplier = new ZoneStatApplier(zoneManager, playerDataService, eventBusService, playerRuntimeAttributeService, loggingUtil);
+        zoneStatApplier.register();
 
         lootTableRegistry = new LootTableRegistry(lootService, loggingUtil);
         lootTableRegistry.applyConfig(gameplayConfigService.getLootTablesConfig());
@@ -257,10 +273,11 @@ public final class MMOCraftPlugin extends JavaPlugin {
 
     private void registerListeners() {
         getServer().getPluginManager().registerEvents(new PlayerJoinQuitListener(playerDataService, loggingUtil), this);
+        getServer().getPluginManager().registerEvents(new PlayerRuntimeAttributeListener(playerRuntimeAttributeService, loggingUtil), this);
         getServer().getPluginManager().registerEvents(new PlayerZoneTrackerListener(zoneManager, loggingUtil, eventBusService), this);
         getServer().getPluginManager().registerEvents(new PlayerCombatListener(damageCalculationService, playerDataService, loggingUtil, mobStatProvider), this);
         getServer().getPluginManager().registerEvents(new PlayerEquipmentListener(this, playerEquipmentManager, loggingUtil), this);
-        getServer().getPluginManager().registerEvents(new ResourceNodeInteractionListener(this, activeNodeManager, resourceNodeRegistryService, lootService, customItemRegistry, playerDataService, loggingUtil), this);
+        getServer().getPluginManager().registerEvents(new ResourceNodeInteractionListener(this, activeNodeManager, resourceNodeRegistryService, lootService, customItemRegistry, playerDataService, gameplayConfigService, loggingUtil), this);
         getServer().getPluginManager().registerEvents(new MobDeathLootListener(lootService, customItemRegistry, this, loggingUtil), this);
         loggingUtil.info("Event listeners registered.");
     }
@@ -280,6 +297,12 @@ public final class MMOCraftPlugin extends JavaPlugin {
         }, statusEffectTickInterval, statusEffectTickInterval);
         loggingUtil.info("StatusEffect tick scheduler started.");
 
+        long runtimeAttributeInterval = 40L;
+        runtimeAttributeTask = getServer().getScheduler().runTaskTimer(this, () -> {
+            if (playerRuntimeAttributeService != null) playerRuntimeAttributeService.updateAllPlayers();
+        }, 20L, runtimeAttributeInterval);
+        loggingUtil.info("Runtime attribute sync scheduler started.");
+
         long spawningInterval = 200L;
         customSpawningTask = getServer().getScheduler().runTaskTimer(this, () -> {
             if (customSpawningService != null) customSpawningService.attemptSpawns();
@@ -295,6 +318,10 @@ public final class MMOCraftPlugin extends JavaPlugin {
         if (eventBusService != null) {
             eventBusService.register(PluginReloadedEvent.class, event -> {
                 loggingUtil.info("PluginReloadedEvent handled: Configuration has been reloaded.");
+                if (playerRuntimeAttributeService != null) {
+                    playerRuntimeAttributeService.updateRuntimeConfig(gameplayConfigService.getRuntimeStatConfig());
+                    playerRuntimeAttributeService.updateAllPlayers();
+                }
             });
         } else {
             loggingUtil.warning("EventBusService was not initialized. Cannot register PluginReloadedEvent handler.");
@@ -394,6 +421,10 @@ public final class MMOCraftPlugin extends JavaPlugin {
             }
             if (playerDataService instanceof BasicPlayerDataService basicService) {
                 basicService.refreshDerivedAttributesForOnlinePlayers();
+            }
+            if (playerRuntimeAttributeService != null) {
+                playerRuntimeAttributeService.updateRuntimeConfig(gameplayConfigService.getRuntimeStatConfig());
+                playerRuntimeAttributeService.updateAllPlayers();
             }
             DemoContentSettings reloadedSettings = DemoContentSettings.fromDemoConfig(
                     gameplayConfigService.getDemoContentConfig(), loggingUtil);

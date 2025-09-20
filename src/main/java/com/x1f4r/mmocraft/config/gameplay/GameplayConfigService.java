@@ -42,6 +42,7 @@ public class GameplayConfigService {
     private final LoggingUtil logger;
 
     private StatScalingConfig statScalingConfig = StatScalingConfig.defaults();
+    private RuntimeStatConfig runtimeStatConfig = RuntimeStatConfig.defaults();
     private LootTablesConfig lootTablesConfig = LootTablesConfig.defaults();
     private DemoContentConfig demoContentConfig = DemoContentConfig.defaults();
     private CraftingConfig craftingConfig = CraftingConfig.defaults();
@@ -71,6 +72,10 @@ public class GameplayConfigService {
 
     public LootTablesConfig getLootTablesConfig() {
         return lootTablesConfig;
+    }
+
+    public RuntimeStatConfig getRuntimeStatConfig() {
+        return runtimeStatConfig;
     }
 
     public DemoContentConfig getDemoContentConfig() {
@@ -117,6 +122,7 @@ public class GameplayConfigService {
     private StatScalingConfig loadStatScalingConfig() {
         Path file = ensureFile("stats.yml");
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file.toFile());
+        runtimeStatConfig = loadRuntimeStatConfig(yaml);
         StatScalingConfig defaults = StatScalingConfig.defaults();
         StatScalingConfig.Builder builder = StatScalingConfig.builder(defaults);
 
@@ -156,6 +162,90 @@ public class GameplayConfigService {
         builder.trueDefenseReductionBase(yaml.getDouble("combat.true-defense-reduction-base", defaults.getTrueDefenseReductionBase()));
         builder.maxDamageReduction(yaml.getDouble("combat.max-damage-reduction", defaults.getMaxDamageReduction()));
         builder.maxEvasionChance(yaml.getDouble("combat.max-evasion-chance", defaults.getMaxEvasionChance()));
+
+        return builder.build();
+    }
+
+    private RuntimeStatConfig loadRuntimeStatConfig(YamlConfiguration yaml) {
+        RuntimeStatConfig defaults = RuntimeStatConfig.defaults();
+        RuntimeStatConfig.Builder builder = defaults.toBuilder();
+
+        ConfigurationSection movement = yaml.getConfigurationSection("runtime.movement");
+        if (movement != null) {
+            builder.movementSettings(RuntimeStatConfig.MovementSettings.builder()
+                    .baseWalkSpeed(movement.getDouble("base-walk-speed", defaults.getMovementSettings().getBaseWalkSpeed()))
+                    .maxWalkSpeed(movement.getDouble("max-walk-speed", defaults.getMovementSettings().getMaxWalkSpeed()))
+                    .minWalkSpeed(movement.getDouble("min-walk-speed", defaults.getMovementSettings().getMinWalkSpeed()))
+                    .speedBaseline(movement.getDouble("speed-baseline", defaults.getMovementSettings().getSpeedBaseline())));
+        }
+
+        ConfigurationSection combat = yaml.getConfigurationSection("runtime.combat");
+        if (combat != null) {
+            builder.combatSettings(RuntimeStatConfig.CombatSettings.builder()
+                    .baseAttackSpeed(combat.getDouble("base-attack-speed", defaults.getCombatSettings().getBaseAttackSpeed()))
+                    .attackSpeedPerPoint(combat.getDouble("attack-speed-per-point", defaults.getCombatSettings().getAttackSpeedPerPoint()))
+                    .maxAttackSpeed(combat.getDouble("max-attack-speed", defaults.getCombatSettings().getMaxAttackSpeed()))
+                    .strengthPhysicalScaling(combat.getDouble("strength-physical-scaling", defaults.getCombatSettings().getStrengthPhysicalScaling()))
+                    .intelligenceMagicalScaling(combat.getDouble("intelligence-magical-scaling", defaults.getCombatSettings().getIntelligenceMagicalScaling()))
+                    .abilityPowerPercentPerPoint(combat.getDouble("ability-power-percent-per-point", defaults.getCombatSettings().getAbilityPowerPercentPerPoint()))
+                    .ferocityPerExtraHit(combat.getDouble("ferocity-per-extra-hit", defaults.getCombatSettings().getFerocityPerExtraHit()))
+                    .ferocityMaxExtraHits(combat.getInt("ferocity-max-extra-hits", defaults.getCombatSettings().getFerocityMaxExtraHits()))
+                    .mobDefenseReductionFactor(combat.getDouble("mob-defense-reduction-factor", defaults.getCombatSettings().getMobDefenseReductionFactor())));
+        }
+
+        ConfigurationSection ability = yaml.getConfigurationSection("runtime.ability");
+        if (ability != null) {
+            builder.abilitySettings(RuntimeStatConfig.AbilitySettings.builder()
+                    .cooldownReductionPerAttackSpeedPoint(ability.getDouble("cooldown-reduction-per-attack-speed-point", defaults.getAbilitySettings().getCooldownReductionPerAttackSpeedPoint()))
+                    .cooldownReductionPerIntelligencePoint(ability.getDouble("cooldown-reduction-per-intelligence-point", defaults.getAbilitySettings().getCooldownReductionPerIntelligencePoint()))
+                    .minimumCooldownSeconds(ability.getDouble("minimum-cooldown-seconds", defaults.getAbilitySettings().getMinimumCooldownSeconds()))
+                    .manaCostReductionPerIntelligencePoint(ability.getDouble("mana-cost-reduction-per-intelligence-point", defaults.getAbilitySettings().getManaCostReductionPerIntelligencePoint()))
+                    .manaCostReductionPerAbilityPowerPoint(ability.getDouble("mana-cost-reduction-per-ability-power-point", defaults.getAbilitySettings().getManaCostReductionPerAbilityPowerPoint()))
+                    .minimumManaCostMultiplier(ability.getDouble("minimum-mana-cost-multiplier", defaults.getAbilitySettings().getMinimumManaCostMultiplier()))
+                    .minimumManaCost(ability.getDouble("minimum-mana-cost", defaults.getAbilitySettings().getMinimumManaCost())));
+        }
+
+        ConfigurationSection gathering = yaml.getConfigurationSection("runtime.gathering");
+        if (gathering != null) {
+            RuntimeStatConfig.GatheringSettings.Builder gatheringBuilder = RuntimeStatConfig.GatheringSettings.builder()
+                    .baseGatherDelaySeconds(gathering.getDouble("base-gather-delay-seconds", defaults.getGatheringSettings().getBaseGatherDelaySeconds()))
+                    .minimumGatherDelaySeconds(gathering.getDouble("minimum-gather-delay-seconds", defaults.getGatheringSettings().getMinimumGatherDelaySeconds()))
+                    .miningSpeedDelayDivisor(gathering.getDouble("mining-speed-delay-divisor", defaults.getGatheringSettings().getMiningSpeedDelayDivisor()))
+                    .miningSpeedHastePerTier(gathering.getDouble("mining-speed-haste-per-tier", defaults.getGatheringSettings().getMiningSpeedHastePerTier()))
+                    .miningSpeedMaxHasteTier(gathering.getInt("mining-speed-max-haste-tier", defaults.getGatheringSettings().getMiningSpeedMaxHasteTier()));
+
+            Map<Stat, Double> fortuneDefaults = new EnumMap<>(Stat.class);
+            fortuneDefaults.put(Stat.MINING_FORTUNE, defaults.getGatheringSettings().getFortunePerPoint(Stat.MINING_FORTUNE));
+            fortuneDefaults.put(Stat.FARMING_FORTUNE, defaults.getGatheringSettings().getFortunePerPoint(Stat.FARMING_FORTUNE));
+            fortuneDefaults.put(Stat.FORAGING_FORTUNE, defaults.getGatheringSettings().getFortunePerPoint(Stat.FORAGING_FORTUNE));
+            fortuneDefaults.put(Stat.FISHING_FORTUNE, defaults.getGatheringSettings().getFortunePerPoint(Stat.FISHING_FORTUNE));
+
+            ConfigurationSection fortuneSection = gathering.getConfigurationSection("fortune-per-point");
+            if (fortuneSection != null) {
+                for (Map.Entry<Stat, Double> entry : fortuneDefaults.entrySet()) {
+                    String key = entry.getKey().name().toLowerCase();
+                    double value = fortuneSection.getDouble(key, entry.getValue());
+                    gatheringBuilder.fortunePerPoint(entry.getKey(), value);
+                }
+            } else {
+                for (Map.Entry<Stat, Double> entry : fortuneDefaults.entrySet()) {
+                    gatheringBuilder.fortunePerPoint(entry.getKey(), entry.getValue());
+                }
+            }
+
+            builder.gatheringSettings(gatheringBuilder);
+        }
+
+        ConfigurationSection mobs = yaml.getConfigurationSection("runtime.mobs");
+        if (mobs != null) {
+            builder.mobScalingSettings(RuntimeStatConfig.MobScalingSettings.builder()
+                    .healthPerLevelPercent(mobs.getDouble("health-per-level-percent", defaults.getMobScalingSettings().getHealthPerLevelPercent()))
+                    .damagePerLevelPercent(mobs.getDouble("damage-per-level-percent", defaults.getMobScalingSettings().getDamagePerLevelPercent()))
+                    .defensePerLevel(mobs.getDouble("defense-per-level", defaults.getMobScalingSettings().getDefensePerLevel()))
+                    .maxHealthMultiplier(mobs.getDouble("max-health-multiplier", defaults.getMobScalingSettings().getMaxHealthMultiplier()))
+                    .maxDamageMultiplier(mobs.getDouble("max-damage-multiplier", defaults.getMobScalingSettings().getMaxDamageMultiplier()))
+                    .maxDefenseBonus(mobs.getDouble("max-defense-bonus", defaults.getMobScalingSettings().getMaxDefenseBonus())));
+        }
 
         return builder.build();
     }

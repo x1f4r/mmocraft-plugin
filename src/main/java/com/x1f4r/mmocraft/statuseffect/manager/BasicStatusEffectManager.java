@@ -4,6 +4,7 @@ import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.playerdata.PlayerDataService;
 import com.x1f4r.mmocraft.playerdata.model.PlayerProfile;
 import com.x1f4r.mmocraft.playerdata.model.Stat;
+import com.x1f4r.mmocraft.playerdata.runtime.PlayerRuntimeAttributeService;
 import com.x1f4r.mmocraft.statuseffect.model.ActiveStatusEffect;
 import com.x1f4r.mmocraft.statuseffect.model.StatusEffect;
 import com.x1f4r.mmocraft.statuseffect.model.StatusEffectType;
@@ -14,9 +15,10 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -26,12 +28,17 @@ public class BasicStatusEffectManager implements StatusEffectManager {
     private final MMOCraftPlugin plugin;
     private final LoggingUtil logger;
     private final PlayerDataService playerDataService;
+    private final PlayerRuntimeAttributeService runtimeAttributeService;
     private final Map<UUID, List<ActiveStatusEffect>> activeEffectsMap = new ConcurrentHashMap<>();
 
-    public BasicStatusEffectManager(MMOCraftPlugin plugin, LoggingUtil logger, PlayerDataService playerDataService) {
+    public BasicStatusEffectManager(MMOCraftPlugin plugin,
+                                   LoggingUtil logger,
+                                   PlayerDataService playerDataService,
+                                   PlayerRuntimeAttributeService runtimeAttributeService) {
         this.plugin = plugin;
         this.logger = logger;
         this.playerDataService = playerDataService;
+        this.runtimeAttributeService = runtimeAttributeService;
         logger.debug("BasicStatusEffectManager initialized.");
     }
 
@@ -73,7 +80,9 @@ public class BasicStatusEffectManager implements StatusEffectManager {
 
             // If it was a stat buff/debuff, PlayerProfile needs recalculation
             if (targetProfile != null && isStatModifyingEffect(effect.getEffectType())) {
+                applyTemporaryStatModifiers(targetProfile, activeEffect);
                 targetProfile.recalculateDerivedAttributes();
+                syncRuntimeAttributesIfPlayer(target);
             }
         } catch (Exception e) {
             logger.severe("Error during onApply for " + effect.getEffectType() + " on " + target.getName(), e);
@@ -109,7 +118,9 @@ public class BasicStatusEffectManager implements StatusEffectManager {
 
         // If it was a stat buff/debuff, PlayerProfile needs recalculation after removal logic (which should revert stats)
         if (targetProfile != null && isStatModifyingEffect(activeEffect.getStatusEffect().getEffectType())) {
+             targetProfile.clearTemporaryStatModifiers(buildSourceKey(activeEffect));
              targetProfile.recalculateDerivedAttributes();
+             syncRuntimeAttributesIfPlayer(target);
         }
     }
 
@@ -243,7 +254,9 @@ public class BasicStatusEffectManager implements StatusEffectManager {
                     effectToRemove.getStatusEffect().onExpire(target, targetProfile);
                     logger.finer("Expired status effect " + effectToRemove.getStatusEffect().getEffectType() + " from " + target.getName());
                     if (targetProfile != null && isStatModifyingEffect(effectToRemove.getStatusEffect().getEffectType())) {
+                        targetProfile.clearTemporaryStatModifiers(buildSourceKey(effectToRemove));
                         targetProfile.recalculateDerivedAttributes();
+                        syncRuntimeAttributesIfPlayer(target);
                     }
                 } catch (Exception e) {
                     logger.severe("Error during onExpire for " + effectToRemove.getStatusEffect().getEffectType() + " on " + target.getName(), e);
@@ -260,6 +273,7 @@ public class BasicStatusEffectManager implements StatusEffectManager {
                         // This is a hypothetical case. Most stat buffs/debuffs apply onApply/onExpire.
                         // If a tick *changes* a stat value that persists, then recalc is needed.
                         targetProfile.recalculateDerivedAttributes();
+                        syncRuntimeAttributesIfPlayer(target);
                     }
                 } catch (Exception e) {
                      logger.severe("Error during onTick for " + effectToTick.getStatusEffect().getEffectType() + " on " + target.getName(), e);
@@ -288,5 +302,59 @@ public class BasicStatusEffectManager implements StatusEffectManager {
         }
         activeEffectsMap.clear();
         logger.info("All active status effects cleared.");
+    }
+
+    private void applyTemporaryStatModifiers(PlayerProfile profile, ActiveStatusEffect activeEffect) {
+        if (profile == null) {
+            return;
+        }
+        Map<Stat, Double> modifiers = resolveStatModifiers(activeEffect);
+        if (modifiers.isEmpty()) {
+            profile.clearTemporaryStatModifiers(buildSourceKey(activeEffect));
+        } else {
+            profile.setTemporaryStatModifiers(buildSourceKey(activeEffect), modifiers);
+        }
+    }
+
+    private Map<Stat, Double> resolveStatModifiers(ActiveStatusEffect activeEffect) {
+        Map<Stat, Double> modifiers = new EnumMap<>(Stat.class);
+        StatusEffectType type = activeEffect.getStatusEffect().getEffectType();
+        double potency = activeEffect.getStatusEffect().getPotency();
+        int stacks = Math.max(1, activeEffect.getStacks());
+        double total = potency * stacks;
+
+        switch (type) {
+            case STAT_BUFF_STRENGTH -> modifiers.put(Stat.STRENGTH, total);
+            case STAT_DEBUFF_STRENGTH, WEAKNESS -> modifiers.put(Stat.STRENGTH, -total);
+            case STAT_BUFF_DEFENSE -> modifiers.put(Stat.DEFENSE, total);
+            case FRAILTY -> modifiers.put(Stat.DEFENSE, -total);
+            case STAT_BUFF_HEALTH -> modifiers.put(Stat.HEALTH, total);
+            case STAT_BUFF_INTELLIGENCE -> modifiers.put(Stat.INTELLIGENCE, total);
+            case STAT_BUFF_CRIT_CHANCE -> modifiers.put(Stat.CRITICAL_CHANCE, total);
+            case STAT_BUFF_CRIT_DAMAGE -> modifiers.put(Stat.CRITICAL_DAMAGE, total);
+            case STAT_BUFF_ABILITY_POWER -> modifiers.put(Stat.ABILITY_POWER, total);
+            case STAT_BUFF_SPEED, MOVEMENT_SPEED_BUFF -> modifiers.put(Stat.SPEED, total);
+            case SLOW -> modifiers.put(Stat.SPEED, -total);
+            case STAT_BUFF_FEROCITY -> modifiers.put(Stat.FEROCITY, total);
+            case STAT_BUFF_EVASION -> modifiers.put(Stat.EVASION, total);
+            default -> {
+            }
+        }
+        return modifiers;
+    }
+
+    private String buildSourceKey(ActiveStatusEffect activeEffect) {
+        return "status:" + activeEffect.getInstanceId();
+    }
+
+    private void syncRuntimeAttributesIfPlayer(LivingEntity target) {
+        if (runtimeAttributeService == null || !(target instanceof Player player)) {
+            return;
+        }
+        try {
+            runtimeAttributeService.syncPlayer(player);
+        } catch (Exception ex) {
+            logger.severe("Failed to sync runtime attributes after status effect update for " + player.getName(), ex);
+        }
     }
 }

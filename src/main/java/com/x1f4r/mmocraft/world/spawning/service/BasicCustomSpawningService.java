@@ -1,26 +1,29 @@
 package com.x1f4r.mmocraft.world.spawning.service;
 
+import com.x1f4r.mmocraft.config.gameplay.GameplayConfigService;
+import com.x1f4r.mmocraft.config.gameplay.RuntimeStatConfig;
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
-import com.x1f4r.mmocraft.combat.service.MobStatProvider; // For applying stats
-import com.x1f4r.mmocraft.item.service.CustomItemRegistry; // For equipment
-import com.x1f4r.mmocraft.loot.service.LootService; // For assigning loot tables (metadata)
+import com.x1f4r.mmocraft.combat.service.MobStatProvider;
+import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
+import com.x1f4r.mmocraft.loot.service.LootService;
+import com.x1f4r.mmocraft.playerdata.PlayerDataService;
+import com.x1f4r.mmocraft.playerdata.model.PlayerProfile;
 import com.x1f4r.mmocraft.util.LoggingUtil;
-import com.x1f4r.mmocraft.util.StringUtil;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import com.x1f4r.mmocraft.world.spawning.model.CustomSpawnRule;
 import com.x1f4r.mmocraft.world.spawning.model.MobSpawnDefinition;
-
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.metadata.FixedMetadataValue; // For custom mob data
+import org.bukkit.metadata.FixedMetadataValue;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,22 +39,33 @@ public class BasicCustomSpawningService implements CustomSpawningService {
     private final MMOCraftPlugin plugin;
     private final LoggingUtil logger;
     private final MobStatProvider mobStatProvider;
-    private final LootService lootService; // To link mob to loot table via metadata
-    private final CustomItemRegistry customItemRegistry; // To create equipment
+    private final LootService lootService;
+    private final CustomItemRegistry customItemRegistry;
+    private final PlayerDataService playerDataService;
+    private final GameplayConfigService gameplayConfigService;
 
     private final List<CustomSpawnRule> spawnRules = new CopyOnWriteArrayList<>();
 
     public static final String METADATA_KEY_CUSTOM_MOB_ID = "MMOCRAFT_CUSTOM_MOB_ID";
     public static final String METADATA_KEY_LOOT_TABLE_ID = "MMOCRAFT_LOOT_TABLE_ID";
+    public static final String METADATA_KEY_SCALED_ATTACK = "MMOCRAFT_SCALED_ATTACK";
+    public static final String METADATA_KEY_SCALED_DEFENSE = "MMOCRAFT_SCALED_DEFENSE";
+    public static final String METADATA_KEY_SCALED_MAX_HEALTH = "MMOCRAFT_SCALED_MAX_HEALTH";
 
-
-    public BasicCustomSpawningService(MMOCraftPlugin plugin, LoggingUtil logger, MobStatProvider mobStatProvider,
-                                      LootService lootService, CustomItemRegistry customItemRegistry) {
+    public BasicCustomSpawningService(MMOCraftPlugin plugin,
+                                      LoggingUtil logger,
+                                      MobStatProvider mobStatProvider,
+                                      LootService lootService,
+                                      CustomItemRegistry customItemRegistry,
+                                      PlayerDataService playerDataService,
+                                      GameplayConfigService gameplayConfigService) {
         this.plugin = plugin;
         this.logger = logger;
         this.mobStatProvider = mobStatProvider;
         this.lootService = lootService;
         this.customItemRegistry = customItemRegistry;
+        this.playerDataService = playerDataService;
+        this.gameplayConfigService = gameplayConfigService;
         logger.debug("BasicCustomSpawningService initialized.");
     }
 
@@ -61,7 +75,6 @@ public class BasicCustomSpawningService implements CustomSpawningService {
             logger.warning("Attempted to register null rule or rule with invalid ID.");
             return;
         }
-        // Check for duplicate ruleId to prevent issues, or decide if replacement is allowed
         if (spawnRules.stream().anyMatch(r -> r.getRuleId().equals(rule.getRuleId()))) {
             logger.warning("Spawn rule with ID '" + rule.getRuleId() + "' already exists. Skipping registration.");
             return;
@@ -72,7 +85,9 @@ public class BasicCustomSpawningService implements CustomSpawningService {
 
     @Override
     public boolean unregisterRule(String ruleId) {
-        if (ruleId == null) return false;
+        if (ruleId == null) {
+            return false;
+        }
         boolean removed = spawnRules.removeIf(rule -> rule.getRuleId().equals(ruleId));
         if (removed) {
             logger.info("Unregistered custom spawn rule: " + ruleId);
@@ -87,80 +102,68 @@ public class BasicCustomSpawningService implements CustomSpawningService {
 
     @Override
     public void attemptSpawns() {
-        long currentTick = Bukkit.getServer().getWorlds().get(0).getFullTime(); // Use a consistent world time
-        logger.finest("Attempting custom spawns at tick: " + currentTick);
-
+        if (Bukkit.getServer().getWorlds().isEmpty()) {
+            return;
+        }
+        long currentTick = Bukkit.getServer().getWorlds().get(0).getFullTime();
         for (World world : Bukkit.getServer().getWorlds()) {
-            // Iterate players to find potential spawn areas around them (more targeted than iterating all chunks)
             for (Player player : world.getPlayers()) {
-                if (player.isDead() || !player.isValid()) continue;
-
-                Location playerLoc = player.getLocation();
-                // Define a radius around player to attempt spawns, e.g., 32-128 blocks
-                int spawnAttemptRadius = 64; // Example
-                int attemptsPerPlayer = 3; // How many random spots to try around a player
-
-                for (int i = 0; i < attemptsPerPlayer; i++) {
-                    // Get a random location within a hollow sphere (e.g., 24-64 blocks away)
-                    double angle = Math.random() * Math.PI * 2;
-                    double distance = 24 + (Math.random() * (spawnAttemptRadius - 24));
-                    int x = (int) (playerLoc.getX() + Math.cos(angle) * distance);
-                    int z = (int) (playerLoc.getZ() + Math.sin(angle) * distance);
-
-                    // Try to find a safe Y level (surface)
-                    Location potentialSpawnLoc = new Location(world, x, 0, z); // Y will be adjusted
-                    potentialSpawnLoc.setY(world.getHighestBlockYAt(x, z) + 1);
-
-                    // Check if chunk is loaded (important!)
-                    if (!world.isChunkLoaded(potentialSpawnLoc.getBlockX() >> 4, potentialSpawnLoc.getBlockZ() >> 4)) {
-                        continue;
-                    }
-
-                    processRulesForLocation(potentialSpawnLoc, world, player, currentTick);
+                if (player.isDead() || !player.isValid()) {
+                    continue;
                 }
+                attemptSpawnsAroundPlayer(player, currentTick);
             }
         }
-        // Placeholder: Actual spawning logic is complex and involves iterating chunks,
-        // finding valid spawn locations (surface, caves, specific blocks), checking light levels, etc.
-        // logger.finer("Custom spawning tick completed. This is currently a placeholder.");
+    }
+
+    private void attemptSpawnsAroundPlayer(Player player, long currentTick) {
+        Location playerLocation = player.getLocation();
+        int spawnAttemptRadius = 64;
+        int attemptsPerPlayer = 3;
+        World world = playerLocation.getWorld();
+        if (world == null) {
+            return;
+        }
+        for (int i = 0; i < attemptsPerPlayer; i++) {
+            double angle = Math.random() * Math.PI * 2;
+            double distance = 24 + (Math.random() * (spawnAttemptRadius - 24));
+            int x = (int) (playerLocation.getX() + Math.cos(angle) * distance);
+            int z = (int) (playerLocation.getZ() + Math.sin(angle) * distance);
+            Location potentialLocation = new Location(world, x, world.getHighestBlockYAt(x, z) + 1, z);
+            if (!world.isChunkLoaded(potentialLocation.getBlockX() >> 4, potentialLocation.getBlockZ() >> 4)) {
+                continue;
+            }
+            processRulesForLocation(potentialLocation, world, player, currentTick);
+        }
     }
 
     private void processRulesForLocation(Location loc, World world, Player nearestPlayer, long currentTick) {
         for (CustomSpawnRule rule : spawnRules) {
             if (!rule.isReadyToAttemptSpawn(currentTick)) {
-                // logger.finest("Rule " + rule.getRuleId() + " not ready for attempt (interval).");
                 continue;
             }
-
             if (!rule.conditionsMet(loc, world, nearestPlayer)) {
-                // logger.finest("Rule " + rule.getRuleId() + " conditions not met at " + loc.toVector());
                 continue;
             }
-
-            // Check maxNearbyEntities
             long nearbyCount = world.getNearbyEntities(loc, rule.getSpawnRadiusCheck(), rule.getSpawnRadiusCheck(), rule.getSpawnRadiusCheck(),
-                entity -> entity.getType() == rule.getMobSpawnDefinition().getEntityType() && !entity.isDead()
-            ).size();
-
+                    entity -> entity.getType() == rule.getMobSpawnDefinition().getEntityType() && !entity.isDead()).size();
             if (nearbyCount >= rule.getMaxNearbyEntities()) {
-                // logger.finest("Rule " + rule.getRuleId() + ": too many nearby entities (" + nearbyCount + "/" + rule.getMaxNearbyEntities() + ")");
                 continue;
             }
-
             if (rule.rollForSpawn()) {
-                spawnMob(loc, rule.getMobSpawnDefinition());
-                rule.setLastSpawnAttemptTickGlobal(currentTick); // Update last attempt time for this rule
+                spawnMob(loc, rule.getMobSpawnDefinition(), nearestPlayer);
+                rule.setLastSpawnAttemptTickGlobal(currentTick);
                 logger.fine("Successfully spawned " + rule.getMobSpawnDefinition().getDefinitionId() + " via rule " + rule.getRuleId() + " at " + loc.toVector());
-                // Potentially break here if only one mob should spawn per chosen spot, or continue for more rules.
                 break;
             }
         }
     }
 
-    private void spawnMob(Location location, MobSpawnDefinition definition) {
+    private void spawnMob(Location location, MobSpawnDefinition definition, Player nearestPlayer) {
         World world = location.getWorld();
-        if (world == null) return;
-
+        if (world == null) {
+            return;
+        }
         Entity spawnedEntity = world.spawnEntity(location, definition.getEntityType());
         if (!(spawnedEntity instanceof LivingEntity livingEntity)) {
             logger.warning("Spawned entity for " + definition.getDefinitionId() + " is not a LivingEntity. Removing.");
@@ -168,37 +171,61 @@ public class BasicCustomSpawningService implements CustomSpawningService {
             return;
         }
 
-        // Apply custom name
         definition.getDisplayName().ifPresent(name -> {
-            livingEntity.customName(LegacyComponentSerializer.legacyAmpersand().deserialize(name));
+            Component component = LegacyComponentSerializer.legacyAmpersand().deserialize(name);
+            livingEntity.customName(component);
             livingEntity.setCustomNameVisible(true);
         });
 
-        // Apply base stats using provided MobStatProvider
+        PlayerProfile referenceProfile = nearestPlayer != null
+                ? playerDataService.getPlayerProfile(nearestPlayer.getUniqueId())
+                : null;
+        RuntimeStatConfig.MobScalingSettings mobScaling = gameplayConfigService.getRuntimeStatConfig().getMobScalingSettings();
+        double levelFactor = referenceProfile != null ? Math.max(0, referenceProfile.getLevel() - 1) : 0;
+
         double baseHealth = mobStatProvider.getBaseHealth(definition.getEntityType());
-        livingEntity.setHealth(baseHealth);
+        double baseAttack = mobStatProvider.getBaseAttackDamage(definition.getEntityType());
+        double baseDefense = mobStatProvider.getBaseDefense(definition.getEntityType());
 
-        // Note: Bukkit has no generic "DEFENSE" attribute. Defense is handled via armor or custom calculations.
-        // We can store our custom defense value as metadata if needed for our damage calculation.
+        double scaledHealth = Math.min(baseHealth * (1.0 + levelFactor * mobScaling.getHealthPerLevelPercent()),
+                baseHealth * mobScaling.getMaxHealthMultiplier());
+        if (scaledHealth <= 0) {
+            scaledHealth = baseHealth;
+        }
+        Attribute maxHealthAttribute = Attribute.MAX_HEALTH;
+        if (livingEntity.getAttribute(maxHealthAttribute) != null) {
+            livingEntity.getAttribute(maxHealthAttribute).setBaseValue(Math.max(1.0, scaledHealth));
+        }
+        livingEntity.setHealth(Math.max(1.0, scaledHealth));
 
-        // Apply equipment
+        double scaledAttack = Math.min(baseAttack * (1.0 + levelFactor * mobScaling.getDamagePerLevelPercent()),
+                baseAttack * mobScaling.getMaxDamageMultiplier());
+        if (scaledAttack <= 0) {
+            scaledAttack = baseAttack;
+        }
+
+        double scaledDefense = Math.min(baseDefense + levelFactor * mobScaling.getDefensePerLevel(),
+                mobScaling.getMaxDefenseBonus());
+        if (scaledDefense < 0) {
+            scaledDefense = baseDefense;
+        }
+
         EntityEquipment equipment = livingEntity.getEquipment();
         if (equipment != null && definition.getEquipment() != null) {
             definition.getEquipment().forEach((slot, itemStack) -> {
                 if (itemStack != null && !itemStack.getType().isAir()) {
-                    equipment.setItem(slot, itemStack.clone()); // Clone to be safe
-                    // Ensure drop chances are set to 0 if desired for mob equipment
+                    equipment.setItem(slot, itemStack.clone());
                     equipment.setDropChance(slot, 0.0f);
                 }
             });
         }
 
-        // Store MMOCraft specific metadata
         livingEntity.setMetadata(METADATA_KEY_CUSTOM_MOB_ID, new FixedMetadataValue(plugin, definition.getDefinitionId()));
-        definition.getLootTableId().ifPresent(lootId -> {
-            livingEntity.setMetadata(METADATA_KEY_LOOT_TABLE_ID, new FixedMetadataValue(plugin, lootId));
-        });
-        // Could also store mobStatKey if it's different from EntityType.name()
+        definition.getLootTableId().ifPresent(lootId ->
+                livingEntity.setMetadata(METADATA_KEY_LOOT_TABLE_ID, new FixedMetadataValue(plugin, lootId)));
+        livingEntity.setMetadata(METADATA_KEY_SCALED_ATTACK, new FixedMetadataValue(plugin, scaledAttack));
+        livingEntity.setMetadata(METADATA_KEY_SCALED_DEFENSE, new FixedMetadataValue(plugin, scaledDefense));
+        livingEntity.setMetadata(METADATA_KEY_SCALED_MAX_HEALTH, new FixedMetadataValue(plugin, scaledHealth));
 
         logger.fine("Custom mob '" + definition.getDefinitionId() + "' spawned at " + location.toVector());
     }
@@ -206,6 +233,5 @@ public class BasicCustomSpawningService implements CustomSpawningService {
     @Override
     public void shutdown() {
         logger.info("BasicCustomSpawningService shutting down. (No specific cleanup actions implemented yet)");
-        // If there were persistent tasks or caches related to spawning locations that need cleanup, do it here.
     }
 }
