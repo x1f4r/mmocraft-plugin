@@ -1,0 +1,114 @@
+# ------------------------------------------------------------
+# Demo content toggles and data
+# ------------------------------------------------------------
+# "toggles" controls which bundles of demo content are activated
+# when the plugin loads.
+#
+# The remaining sections provide the content payload that used to
+# be embedded directly in Java. Admins can tune these numbers and
+# run /mmocadm reloadconfig to apply changes at runtime.
+# ------------------------------------------------------------
+
+toggles:
+  master: false
+  items: true
+  skills: true
+  loot-tables: true
+  custom-spawns: true
+  resource-nodes: true
+  zones: false
+
+loot-tables:
+  mobs:
+    - entity: ZOMBIE
+      table-id: zombie_common_drops
+      entries:
+        - type: CUSTOM
+          id: simple_sword
+          chance: 0.05
+          min: 1
+          max: 1
+  generic:
+    - table-id: stone_node_loot
+      entries:
+        - type: VANILLA
+          id: COBBLESTONE
+          chance: 1.0
+          min: 1
+          max: 1
+    - table-id: iron_ore_node_loot
+      entries:
+        - type: VANILLA
+          id: RAW_IRON
+          chance: 1.0
+          min: 1
+          max: 1
+    - table-id: warrior_common_loot
+      entries:
+        - type: CUSTOM
+          id: simple_sword
+          chance: 0.25
+          min: 1
+          max: 1
+
+resource-nodes:
+  types:
+    - type-id: stone_node
+      block: STONE
+      harvest-seconds: 5.0
+      required-tools:
+        - WOODEN_PICKAXE
+        - STONE_PICKAXE
+        - IRON_PICKAXE
+        - DIAMOND_PICKAXE
+        - NETHERITE_PICKAXE
+      loot-table-id: stone_node_loot
+      respawn-seconds: 60
+      display-name: "&7Stone Deposit"
+    - type-id: iron_ore_node
+      block: IRON_ORE
+      harvest-seconds: 10.0
+      required-tools:
+        - STONE_PICKAXE
+        - IRON_PICKAXE
+        - DIAMOND_PICKAXE
+        - NETHERITE_PICKAXE
+      loot-table-id: iron_ore_node_loot
+      respawn-seconds: 180
+      display-name: "&fIron Vein"
+  placements:
+    - node-type-id: stone_node
+      x: 10
+      y: 60
+      z: 10
+    - node-type-id: stone_node
+      x: 12
+      y: 60
+      z: 10
+    - node-type-id: iron_ore_node
+      x: 10
+      y: 60
+      z: 12
+
+custom-spawns:
+  - rule-id: plains_skeletal_warriors_night
+    mob-id: skeletal_warrior
+    entity-type: SKELETON
+    display-name: "&cSkeletal Warrior"
+    stat-profile-id: skeletal_warrior_stats
+    loot-table-id: warrior_common_loot
+    equipment:
+      HAND: IRON_SWORD
+    biomes:
+      - PLAINS
+      - MEADOW
+      - SAVANNA
+    time-window:
+      start: 13000
+      end: 23000
+    spawn-chance: 0.1
+    min-y: 60
+    max-y: 200
+    max-nearby: 5
+    radius: 16.0
+    interval-ticks: 200

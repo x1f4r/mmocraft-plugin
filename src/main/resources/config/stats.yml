@@ -1,0 +1,36 @@
+# ------------------------------------------------------------
+# Player stat scaling controls
+# ------------------------------------------------------------
+# "defaults" specifies the baseline value for each core stat when
+# a new profile is created. "base-stat" is applied to every stat
+# unless an override is defined under "overrides".
+#
+# "derived" contains the coefficients used when converting core
+# stats and player level into derived combat attributes.
+# ------------------------------------------------------------
+
+defaults:
+  base-stat: 10.0
+  overrides:
+    vitality: 12.0
+    wisdom: 11.0
+
+derived:
+  base-health: 50
+  health-per-vitality: 5.0
+  health-per-level: 2.0
+  base-mana: 20
+  mana-per-wisdom: 3.0
+  mana-per-level: 1.0
+  base-critical-hit-chance: 0.05
+  crit-chance-per-agility: 0.005
+  crit-chance-per-luck: 0.002
+  base-critical-damage-bonus: 1.5
+  crit-damage-bonus-per-strength: 0.01
+  base-evasion-chance: 0.02
+  evasion-per-agility: 0.004
+  evasion-per-luck: 0.001
+  phys-reduction-per-defense: 0.005
+  max-phys-reduction: 0.80
+  magic-reduction-per-wisdom: 0.003
+  max-magic-reduction: 0.80

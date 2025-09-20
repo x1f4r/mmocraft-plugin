@@ -1,6 +1,8 @@
 package com.x1f4r.mmocraft.diagnostics;
 
-import com.x1f4r.mmocraft.config.ConfigService;
+import com.x1f4r.mmocraft.config.gameplay.GameplayConfigIssue;
+import com.x1f4r.mmocraft.config.gameplay.GameplayConfigService;
+import com.x1f4r.mmocraft.config.gameplay.StatScalingConfig;
 import com.x1f4r.mmocraft.item.model.CustomItem;
 import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
 import com.x1f4r.mmocraft.persistence.PersistenceService;
@@ -33,7 +35,7 @@ public class PluginDiagnosticsService {
     private final SkillRegistryService skillRegistryService;
     private final ActiveNodeManager activeNodeManager;
     private final ResourceNodeRegistryService resourceNodeRegistryService;
-    private final ConfigService configService;
+    private final GameplayConfigService gameplayConfigService;
     private final PersistenceService persistenceService;
 
     public PluginDiagnosticsService(
@@ -42,7 +44,7 @@ public class PluginDiagnosticsService {
             SkillRegistryService skillRegistryService,
             ActiveNodeManager activeNodeManager,
             ResourceNodeRegistryService resourceNodeRegistryService,
-            ConfigService configService,
+            GameplayConfigService gameplayConfigService,
             PersistenceService persistenceService
     ) {
         this.logger = logger;
@@ -50,7 +52,7 @@ public class PluginDiagnosticsService {
         this.skillRegistryService = skillRegistryService;
         this.activeNodeManager = activeNodeManager;
         this.resourceNodeRegistryService = resourceNodeRegistryService;
-        this.configService = configService;
+        this.gameplayConfigService = gameplayConfigService;
         this.persistenceService = persistenceService;
     }
 
@@ -99,24 +101,27 @@ public class PluginDiagnosticsService {
     }
 
     private void checkConfig(List<DiagnosticEntry> results) {
-        if (configService == null) {
-            results.add(entry(Severity.WARNING, "Configuration service is unavailable.",
-                    "Default values will be used and configuration changes cannot be applied."));
+        if (gameplayConfigService == null) {
+            results.add(entry(Severity.WARNING, "Gameplay configuration service is unavailable.",
+                    "Default values will be used and tuning changes cannot be applied."));
             return;
         }
 
-        int maxHealth = configService.getInt("stats.max-health");
-        if (maxHealth <= 0) {
-            results.add(entry(Severity.ERROR, "Configured max health is invalid (" + maxHealth + ").",
-                    "Update stats.max-health in mmocraft.conf to a positive value."));
+        StatScalingConfig stats = gameplayConfigService.getStatScalingConfig();
+        if (stats.getBaseHealth() <= 0) {
+            results.add(entry(Severity.ERROR, "Base health from stats.yml is not positive.",
+                    "Update derived.base-health to a value greater than zero."));
         } else {
-            results.add(entry(Severity.INFO, "Configured max health: " + maxHealth));
+            results.add(entry(Severity.INFO, "Base health configured to " + stats.getBaseHealth()));
         }
 
-        double baseDamage = configService.getDouble("stats.base-damage");
-        if (baseDamage <= 0) {
-            results.add(entry(Severity.WARNING, "Base damage is set to " + baseDamage + ".",
-                    "Players may never deal damage. Adjust stats.base-damage in mmocraft.conf."));
+        for (GameplayConfigIssue issue : gameplayConfigService.getIssues()) {
+            Severity severity = switch (issue.severity()) {
+                case ERROR -> Severity.ERROR;
+                case WARNING -> Severity.WARNING;
+                default -> Severity.INFO;
+            };
+            results.add(entry(severity, issue.message(), issue.detail()));
         }
     }
 

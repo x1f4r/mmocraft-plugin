@@ -1,5 +1,6 @@
 package com.x1f4r.mmocraft.playerdata;
 
+import com.x1f4r.mmocraft.config.gameplay.StatScalingConfig;
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.eventbus.EventBusService;
 import com.x1f4r.mmocraft.persistence.PersistenceService;
@@ -219,12 +220,16 @@ public class BasicPlayerDataService implements PlayerDataService {
     @Override
     public Map<Stat, Double> getDefaultStats() {
         Map<Stat, Double> defaultStats = new EnumMap<>(Stat.class);
+        StatScalingConfig config = plugin.getGameplayConfigService().getStatScalingConfig();
         for (Stat stat : Stat.values()) {
-            defaultStats.put(stat, 10.0);
+            defaultStats.put(stat, config.getDefaultStatValue(stat));
         }
-        defaultStats.put(Stat.VITALITY, 12.0);
-        defaultStats.put(Stat.WISDOM, 11.0);
         return defaultStats;
+    }
+
+    public void refreshDerivedAttributesForOnlinePlayers() {
+        onlinePlayerProfiles.values().forEach(PlayerProfile::recalculateDerivedAttributes);
+        logger.debug("Refreshed derived attributes for " + onlinePlayerProfiles.size() + " cached profiles after config update.");
     }
 
     @Override
