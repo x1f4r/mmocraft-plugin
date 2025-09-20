@@ -1,24 +1,20 @@
 package com.x1f4r.mmocraft.command.commands.admin;
 
 import com.x1f4r.mmocraft.command.AbstractPluginCommand;
+import com.x1f4r.mmocraft.command.CommandExecutable;
 import com.x1f4r.mmocraft.combat.model.DamageInstance;
 import com.x1f4r.mmocraft.combat.model.DamageType;
 import com.x1f4r.mmocraft.combat.service.DamageCalculationService;
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
-import com.x1f4r.mmocraft.command.CommandExecutable;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
-
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import java.util.Collections;
-import org.bukkit.inventory.ItemStack;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -68,6 +64,23 @@ public class CombatAdminCommand extends AbstractPluginCommand {
 
             @Override
             public List<String> onTabComplete(CommandSender sender, String[] args) {
+                if (!sender.hasPermission(PERM_COMBAT_TESTDAMAGE)) {
+                    return Collections.emptyList();
+                }
+                if (args.length == 0) {
+                    return Collections.emptyList();
+                }
+                if (args.length == 1 || args.length == 2) {
+                    return null; // Delegate to Bukkit for player name completion
+                }
+                if (args.length == 3) {
+                    String prefix = args[2].toLowerCase();
+                    return VANILLA_WEAPON_DAMAGE_MAP.keySet().stream()
+                            .map(Enum::name)
+                            .filter(name -> name.toLowerCase().startsWith(prefix))
+                            .sorted()
+                            .collect(Collectors.toList());
+                }
                 return Collections.emptyList();
             }
         });
@@ -150,34 +163,6 @@ public class CombatAdminCommand extends AbstractPluginCommand {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, String[] args) {
-        // args[0] is "combat" (this command's name as a subcommand of /mmocadm)
-        // args[1] is the subcommand of "combat" (e.g., "testdamage")
-        // args[2] is first arg for "testdamage" (attackerName)
-        // args[3] is second arg for "testdamage" (victimName)
-        // args[4] is third arg for "testdamage" (weaponMaterialName)
-
-        String currentCmdArg = args[args.length -1].toLowerCase();
-
-        if (args.length == 2) { // Suggest subcommand names
-            return subCommands.keySet().stream()
-                    .filter(name -> name.startsWith(args[1].toLowerCase()))
-                    .collect(Collectors.toList());
-        }
-
-        String combatSubCommand = args[1].toLowerCase();
-
-        if (combatSubCommand.equals("testdamage")) {
-            if (!sender.hasPermission(PERM_COMBAT_TESTDAMAGE)) return Collections.emptyList();
-            if (args.length == 3 || args.length == 4) { // Attacker or Victim name
-                return null; // Bukkit default player name completion
-            }
-            if (args.length == 5) { // Weapon Material
-                return VANILLA_WEAPON_DAMAGE_MAP.keySet().stream()
-                        .map(Enum::name)
-                        .filter(name -> name.toLowerCase().startsWith(currentCmdArg))
-                        .collect(Collectors.toList());
-            }
-        }
         return Collections.emptyList();
     }
 }

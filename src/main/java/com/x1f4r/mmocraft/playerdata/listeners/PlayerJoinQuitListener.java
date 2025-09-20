@@ -1,6 +1,7 @@
 package com.x1f4r.mmocraft.playerdata.listeners;
 
 import com.x1f4r.mmocraft.playerdata.PlayerDataService;
+import com.x1f4r.mmocraft.playerdata.hud.PlayerHudService;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -14,10 +15,16 @@ public class PlayerJoinQuitListener implements Listener {
 
     private final PlayerDataService playerDataService;
     private final LoggingUtil logger;
+    private final PlayerHudService playerHudService;
 
     public PlayerJoinQuitListener(PlayerDataService playerDataService, LoggingUtil logger) {
+        this(playerDataService, logger, null);
+    }
+
+    public PlayerJoinQuitListener(PlayerDataService playerDataService, LoggingUtil logger, PlayerHudService playerHudService) {
         this.playerDataService = playerDataService;
         this.logger = logger;
+        this.playerHudService = playerHudService;
         logger.debug("PlayerJoinQuitListener initialized.");
     }
 
@@ -93,6 +100,9 @@ public class PlayerJoinQuitListener implements Listener {
             .thenRun(() -> {
                 logger.info("Profile saved successfully for " + player.getName() + " on quit.");
                 playerDataService.uncachePlayerProfile(player.getUniqueId());
+                if (playerHudService != null) {
+                    playerHudService.clearCache(player.getUniqueId());
+                }
             })
             .exceptionally(ex -> {
                 logger.severe("Failed to save profile for " + player.getName() + " on quit: " + ex.getMessage(), ex);
@@ -100,6 +110,9 @@ public class PlayerJoinQuitListener implements Listener {
                 // Still uncache to prevent issues with stale data in memory if player rejoins quickly? Or keep to retry save?
                 // For now, let's still uncache.
                 playerDataService.uncachePlayerProfile(player.getUniqueId());
+                if (playerHudService != null) {
+                    playerHudService.clearCache(player.getUniqueId());
+                }
                 return null;
             });
     }
