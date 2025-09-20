@@ -25,6 +25,7 @@ public class MMOCAdminRootCommand extends AbstractPluginCommand {
         registerSubCommand("resource", new ResourceAdminCommand(plugin, "mmocadm resource", "mmocraft.admin.resource"));
         registerSubCommand("demo", new DemoAdminCommand(plugin));
         registerSubCommand("diagnostics", new DiagnosticsAdminCommand(plugin));
+        registerSubCommand("issues", new DiagnosticsIssuesCommand(plugin));
         registerSubCommand("reloadconfig", new ReloadConfigAdminCommand(plugin));
         // Example: registerSubCommand("config", new ConfigAdminCommand(plugin));
     }
@@ -44,6 +45,7 @@ public class MMOCAdminRootCommand extends AbstractPluginCommand {
         }
         if (sender.hasPermission("mmocraft.admin.diagnostics")) {
             sender.sendMessage(StringUtil.colorize("&e/mmocadm diagnostics &7- Run plugin health checks and log issues."));
+            sender.sendMessage(StringUtil.colorize("&e/mmocadm issues &7- List outstanding warnings or errors."));
         }
         if (sender.hasPermission("mmocraft.admin.reload")) {
             sender.sendMessage(StringUtil.colorize("&e/mmocadm reloadconfig &7- Reload gameplay configuration files."));

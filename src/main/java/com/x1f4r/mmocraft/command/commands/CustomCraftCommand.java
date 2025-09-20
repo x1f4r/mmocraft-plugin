@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 public class CustomCraftCommand extends AbstractPluginCommand {
 
@@ -32,7 +33,14 @@ public class CustomCraftCommand extends AbstractPluginCommand {
         Player player = (Player) sender;
         if (craftingUIManager == null) {
             player.sendMessage(Component.text("Crafting system is currently unavailable. Please contact an administrator.", NamedTextColor.RED));
-            plugin.getLoggingUtil().severe("CraftingUIManager is null for /customcraft command!");
+            plugin.getLoggingUtil().structuredError(
+                    "command-execution",
+                    "Crafting UI manager unavailable for /customcraft.",
+                    Map.of(
+                            "command", "/customcraft",
+                            "player", player.getName()
+                    )
+            );
             return true;
         }
 

@@ -6,11 +6,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -118,5 +121,35 @@ class LoggingUtilTest {
         String message = "This is a finest message.";
         loggingUtil.finest(message);
         verify(mockBukkitLogger).finest(expectedPrefix + message);
+    }
+
+    @Test
+    void structuredWarning_shouldEmitJsonPayload() {
+        loggingUtil.structuredWarning("crafting", "Unable to craft", Map.of("recipeId", "demo", "player", "Alex"));
+
+        ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockBukkitLogger).log(eq(Level.WARNING), payloadCaptor.capture());
+        String payload = payloadCaptor.getValue();
+        assertAll(
+                () -> org.junit.jupiter.api.Assertions.assertTrue(payload.contains("\"severity\":\"WARNING\"")),
+                () -> org.junit.jupiter.api.Assertions.assertTrue(payload.contains("\"event\":\"crafting\"")),
+                () -> org.junit.jupiter.api.Assertions.assertTrue(payload.contains("\"recipeId\":\"demo\"")),
+                () -> org.junit.jupiter.api.Assertions.assertTrue(payload.contains("\"player\":\"Alex\""))
+        );
+    }
+
+    @Test
+    void structuredError_withThrowable_shouldIncludeContext() {
+        RuntimeException throwable = new RuntimeException("boom");
+        loggingUtil.structuredError("stats", "Failed to compute", Map.of("stat", "strength"), throwable);
+
+        ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockBukkitLogger).log(eq(Level.SEVERE), payloadCaptor.capture(), eq(throwable));
+        String payload = payloadCaptor.getValue();
+        assertAll(
+                () -> org.junit.jupiter.api.Assertions.assertTrue(payload.contains("\"severity\":\"ERROR\"")),
+                () -> org.junit.jupiter.api.Assertions.assertTrue(payload.contains("\"stat\":\"strength\"")),
+                () -> org.junit.jupiter.api.Assertions.assertTrue(payload.contains("\"message\":\"Failed to compute\""))
+        );
     }
 }

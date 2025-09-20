@@ -38,12 +38,20 @@ public class BasicRecipeRegistryService implements RecipeRegistryService {
     @Override
     public void registerRecipe(CustomRecipe recipe) {
         if (recipe == null || recipe.getRecipeId() == null || recipe.getRecipeId().trim().isEmpty()) {
-            logger.warning("Attempted to register a null recipe or recipe with an invalid ID.");
+            logger.structuredWarning(
+                    "crafting-runtime",
+                    "Attempted to register an invalid recipe.",
+                    Map.of("recipeId", recipe != null ? String.valueOf(recipe.getRecipeId()) : "null")
+            );
             return;
         }
         CustomRecipe existing = recipes.put(recipe.getRecipeId().toLowerCase(), recipe);
         if (existing != null) {
-            logger.warning("Recipe ID '" + recipe.getRecipeId() + "' was already registered. Overwriting.");
+            logger.structuredWarning(
+                    "crafting-runtime",
+                    "Recipe registration overwrote an existing entry.",
+                    Map.of("recipeId", recipe.getRecipeId())
+            );
         } else {
             logger.info("Registered recipe: " + recipe.getRecipeId() + " (Output: " + recipe.getOutputItemStack().getType() + ")");
         }
@@ -108,14 +116,12 @@ public class BasicRecipeRegistryService implements RecipeRegistryService {
         // For CUSTOM_SHAPED (placeholder)
         else if (type == RecipeType.CUSTOM_SHAPED) {
             // TODO: Implement shaped recipe matching.
-            // This involves:
-            // 1. Getting the items from the grid in order (e.g., ItemStack[9] for 3x3).
-            // 2. For each shaped recipe:
-            //    a. Comparing its ingredient map (slot -> CustomRecipeIngredient)
-            //       with the items in the grid at corresponding slots.
-            //    b. Handling rotations or mirrored versions if the recipe allows.
-            //    c. Using CustomRecipeIngredient.matches() for each comparison.
-            logger.warning("Shaped recipe matching is not yet fully implemented in BasicRecipeRegistryService.");
+            // This involves iterating through the crafting grid and matching slots.
+            logger.structuredWarning(
+                    "crafting-runtime",
+                    "Shaped recipe matching not yet implemented.",
+                    Map.of("recipeType", type.name())
+            );
         }
 
         return Optional.empty();

@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -143,7 +144,16 @@ public class ExecuteSkillCommand extends AbstractPluginCommand {
             // Skills that change profile data (like MinorHeal changing health) modify the cached PlayerProfile.
         } catch (Exception e) {
             casterPlayer.sendMessage(Component.text("An error occurred while using the skill: " + e.getMessage(), NamedTextColor.RED));
-            plugin.getLoggingUtil().severe("Error executing skill " + skill.getSkillId() + " for " + casterPlayer.getName(), e);
+            plugin.getLoggingUtil().structuredError(
+                    "command-execution",
+                    "Skill execution failed.",
+                    Map.of(
+                            "skillId", skill.getSkillId(),
+                            "player", casterPlayer.getName(),
+                            "skillType", skill.getSkillType().name()
+                    ),
+                    e
+            );
         }
         return true;
     }

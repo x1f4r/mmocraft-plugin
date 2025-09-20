@@ -5,6 +5,7 @@ import com.x1f4r.mmocraft.item.model.CustomItem;
 import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import java.util.Map;
 import java.util.Objects;
 
 public class CustomRecipeIngredient {
@@ -65,7 +66,11 @@ public class CustomRecipeIngredient {
                 } catch (IllegalArgumentException e) {
                     // Invalid material name in recipe definition
                     if (plugin != null && plugin.getLoggingUtil() != null) {
-                         plugin.getLoggingUtil().warning("Invalid material identifier in recipe ingredient: " + this.identifier);
+                         plugin.getLoggingUtil().structuredWarning(
+                                 "crafting-runtime",
+                                 "Invalid material identifier in recipe ingredient.",
+                                 Map.of("identifier", this.identifier)
+                         );
                     }
                     return false;
                 }
