@@ -87,36 +87,53 @@ MMOCraft is built on a collection of robust, interconnected systems.
 *   **Custom Recipes:** A framework for defining custom shaped and shapeless recipes using custom or vanilla items.
 *   **Custom Crafting UI:** A basic `/customcraft` command and UI, ready to be expanded into a full-featured custom crafting station.
 
+### Observability & Diagnostics
+*   **Structured Logging:** `LoggingUtil` emits JSON-formatted payloads for info, warning, and error events so that failures across combat, crafting, and commands surface with machine-readable context.
+*   **Automated Health Checks:** `PluginDiagnosticsService` audits registered items, skills, gameplay configuration, persistence, resource nodes, demo content, crafting recipes, and required listeners, returning severity-tagged entries for each subsystem.
+*   **Admin Tooling:** `/mmocadm diagnostics` generates the full report, `/mmocadm issues` filters to outstanding warnings or errors, and `/mmocadm reloadconfig` reapplies the configuration bundle while logging any problems that remain.
+
 ## Configuration
 
 MMOCraft uses a combination of configuration files and programmatic setup.
 
 ### `mmocraft.conf`
-This file, located in `/plugins/MMOCraft/`, contains basic settings.
+This file, located in `/plugins/MMOCraft/`, contains the root plugin preferences and is copied from the JAR if it is missing.
 
 ```yaml
-# core settings
+# === MMOCraft default configuration ===
+# This file should be in YAML format for BasicConfigService to parse it correctly.
+
 core:
-  debug-logging: false # Set to true to see detailed debug messages in the console.
+  debug-logging: false # Controls debug level messages from LoggingUtil
 
 stats:
   max-health: 100
   base-damage: 5
+  default-mana: 50
+  default-stamina: 50
 
+# Example list
+welcome-messages:
+  - "Welcome to MMOCraft!"
+  - "This server is running MMOCraft."
+  - "Enjoy your adventure!"
+
+# Example boolean for other features (can be namespaced too)
 features:
   pvp-enabled: true
+  # debug-mode: false # Kept for reference, but LoggingUtil uses core.debug-logging
 
 demo:
-  enabled: true
-  items: true
-  skills: true
-  loot-tables: true
-  custom-spawns: true
-  resource-nodes: true
-  zones: true
+  enabled: true # Master toggle for all sample/demo content bundled with MMOCraft.
+  items: true # Registers showcase items such as the Simple Iron Sword.
+  skills: true # Registers showcase skills like Strong Strike and Minor Heal.
+  loot-tables: true # Enables the default loot table examples used by demo mobs/nodes.
+  custom-spawns: true # Enables the sample skeletal warrior custom spawn rule.
+  resource-nodes: true # Places sample resource nodes and registers their types.
+  zones: true # Copies the default zones.yml containing the Spawn Sanctuary example.
 ```
 
-The `demo` section controls whether the bundled showcase content (items, skills, loot tables, spawns, zones, and starter resource nodes) is automatically registered. Disable the master toggle or individual flags if you want a clean slate while keeping the engine systems active.
+`core.debug-logging` is consumed by `LoggingUtil` for runtime debug output, while the remaining values act as high-level defaults. The legacy demo flags remain in the file for compatibility, but the runtime demo module ultimately follows the toggles defined in `config/demo-content.yml` when `DemoContentSettings` are built and applied.
 
 ### `zones.yml`
 This file, located in `/plugins/MMOCraft/`, is used to define custom zones.
@@ -136,15 +153,29 @@ spawn_sanctuary:
     pvpAllowed: false
 ```
 
-### Programmatic Configuration (For Developers)
+### Gameplay Configuration (`/plugins/MMOCraft/config/`)
+`GameplayConfigService` creates this directory on startup, copies the bundled defaults, and keeps parsed issues so that admins can review them after reloads. Use `/mmocadm reloadconfig` whenever you change these files to reapply them without rebooting.
 
-Currently, more complex systems are configured directly in the Java code. This is a temporary measure, with the goal of moving to configuration files in the future. This includes:
-*   **Custom Items:** Defined by creating new classes that extend `CustomItem`.
-*   **Custom Recipes:** Defined by creating `CustomRecipe` objects.
-*   **Custom Mob Spawns:** Defined by creating `MobSpawnDefinition` and `CustomSpawnRule` objects.
-*   **Loot Tables:** Defined by creating `LootTable` objects.
+#### `stats.yml`
+Controls player stat scaling, combat baselines, runtime combat/ability/gathering behaviour, and mob scaling curves. Each section lets you override per-stat base, per-point, and per-level values plus optional diminishing returns for bespoke tuning. Reloading this file immediately updates the live runtime attribute service for online players.
 
-These are all registered with their respective services during the plugin's `onEnable` phase.
+#### `loot_tables.yml`
+Defines named loot tables and binds them to mobs. Entries specify loot type, identifier, drop chance, and amount, and mob assignments attach those tables to Bukkit `EntityType`s at runtime.
+
+#### `crafting.toml`
+Lists enabled custom recipes with `RecipeType`, optional permissions, and either shapeless ingredient arrays or shaped slot maps. Both vanilla materials and custom items are supported, and the loader unregisters stale recipes before applying new ones to keep the registry in sync.
+
+#### `demo-content.yml`
+Provides the data payload consumed by the demo module—toggles for each bundle, loot-table definitions, resource node types and placements, and custom spawn rules with biome, equipment, and timing constraints. When those features are enabled, `DemoContentModule` reads this configuration to register items, recipes, loot, spawns, and resource nodes for the showcase experience.
+
+### Programmatic Extensions (For Developers)
+
+Configuration files cover the common cases, but bespoke content is still authored in Java:
+*   **Custom Items:** Implement new subclasses of `CustomItem` and register them with the item registry. The demo module shows how a bundle of items is published when item toggles are enabled.
+*   **Advanced Recipes:** You can still craft infusion-style or scripted recipes by instantiating `CustomRecipe` objects and handing them to the registry, just as the demo module does for its crafting flow.
+*   **Custom Mob Spawns:** Build bespoke encounters by composing `CustomSpawnRule` instances with conditions and registering them through the spawning service.
+
+These hooks let you pair data-driven configuration with tailored Java logic whenever you need behaviour beyond what the shipped config files express.
 
 ## Commands
 
@@ -153,6 +184,7 @@ Here is a list of the available commands.
 ### Player Commands
 | Command | Description | Permission |
 | --- | --- | --- |
+| `/mmoc [help|version|profile]` | Shows plugin info, help, and a stat sheet for the executing player. | `mmocraft.command.info` |
 | `/useskill <skillId> [target]` | Executes a learned skill. | `mmocraft.command.useskill` |
 | `/customcraft` | Opens the custom crafting interface. | `mmocraft.command.customcraft` |
 
@@ -163,6 +195,7 @@ The base permission for all admin commands is `mmocraft.admin`.
 | --- | --- | --- |
 | `/mmocadm item give <player> <itemId> [amount]` | Gives a player a custom item. | `mmocraft.admin.item.give` |
 | `/mmocadm item list [filter] [page]` | Lists the registered custom items, optionally filtered. | `mmocraft.admin.item.list` |
+| `/mmocadm resource <place|remove|info>` | Place, remove, or inspect resource nodes at targeted locations. | `mmocraft.admin.resource` |
 | `/mmocadm combat testdamage <attacker> <victim> [weapon]` | Simulates a damage calculation. | `mmocraft.admin.combat.testdamage` |
 | `/mmocadm playerdata view <player>` | Views a player's profile data. | `mmocraft.admin.playerdata.view` |
 | `/mmocadm playerdata setstat <player> <stat> <value>` | Sets a player's core stat. | `mmocraft.admin.playerdata.setstat` |
@@ -171,6 +204,8 @@ The base permission for all admin commands is `mmocraft.admin`.
 | `/mmocadm playerdata addcurrency <player> <amount>`| Adds or removes currency from a player. | `mmocraft.admin.playerdata.addcurrency` |
 | `/mmocadm demo <status|enable|disable|reload>` | Inspect or change the bundled demo content toggles. | `mmocraft.admin.demo` |
 | `/mmocadm diagnostics` | Runs a plugin health report and logs warnings/errors. | `mmocraft.admin.diagnostics` |
+| `/mmocadm issues` | Lists outstanding warnings or errors from the diagnostics service. | `mmocraft.admin.diagnostics` |
+| `/mmocadm reloadconfig` | Reloads `mmocraft.conf` and the gameplay configuration bundle. | `mmocraft.admin.reload` |
 
 ## For Developers
 
