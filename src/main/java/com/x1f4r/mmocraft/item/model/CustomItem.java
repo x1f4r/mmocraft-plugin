@@ -4,7 +4,6 @@ import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.item.api.NBTUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Material;
@@ -28,6 +27,7 @@ public abstract class CustomItem {
 
     protected final MMOCraftPlugin plugin;
     public static final String CUSTOM_ITEM_ID_NBT_KEY = "MMOCRAFT_ITEM_ID";
+    public static final String CUSTOM_ITEM_ABILITY_IDS_NBT_KEY = "MMOCRAFT_ITEM_ABILITIES";
 
     /**
      * Constructs a new CustomItem.
@@ -93,6 +93,20 @@ public abstract class CustomItem {
     }
 
     /**
+     * @return Ability descriptors linked to this item for tooltip and metadata generation.
+     */
+    public List<ItemAbilityDescriptor> getAbilityDescriptors() {
+        return Collections.emptyList();
+    }
+
+    /**
+     * @return Crafting or unlock hints surfaced in admin tooling.
+     */
+    public List<String> getRecipeHints() {
+        return Collections.emptyList();
+    }
+
+    /**
      * @return The {@link ItemRarity} of this item. Defaults to {@link ItemRarity#COMMON}.
      *         Subclasses should override this to specify a different rarity.
      */
@@ -134,6 +148,38 @@ public abstract class CustomItem {
                 for (String line : baseLore) {
                     finalLore.add(StringUtil.colorize(line));
                 }
+            }
+
+            // Insert ability details before stat modifiers if defined
+            String abilityIdString = null;
+            List<ItemAbilityDescriptor> abilities = getAbilityDescriptors();
+            if (abilities != null && !abilities.isEmpty()) {
+                if (!finalLore.isEmpty()) {
+                    finalLore.add("");
+                }
+                for (ItemAbilityDescriptor ability : abilities) {
+                    String activation = ability.activationHint().isBlank()
+                            ? ""
+                            : " &7(" + ability.activationHint() + ")";
+                    finalLore.add(StringUtil.colorize("&6Ability: &e" + ability.displayName() + activation));
+
+                    List<String> resourceParts = new ArrayList<>();
+                    if (ability.consumesMana()) {
+                        resourceParts.add("&b" + String.format("%.0f", ability.manaCost()) + " Mana");
+                    }
+                    if (ability.hasCooldown()) {
+                        resourceParts.add("&b" + String.format("%.1f", ability.cooldownSeconds()) + "s Cooldown");
+                    }
+                    if (!resourceParts.isEmpty()) {
+                        finalLore.add(StringUtil.colorize("&7" + String.join(" &7| ", resourceParts)));
+                    }
+                    if (ability.hasSummary()) {
+                        finalLore.add(StringUtil.colorize("&7" + ability.summary()));
+                    }
+                }
+                abilityIdString = abilities.stream()
+                        .map(ItemAbilityDescriptor::abilityId)
+                        .collect(Collectors.joining(","));
             }
 
             // Add stat modifiers to lore automatically
@@ -190,6 +236,9 @@ public abstract class CustomItem {
 
             // Set the custom item ID NBT tag
             NBTUtil.setString(itemStack, CUSTOM_ITEM_ID_NBT_KEY, getItemId(), plugin);
+            if (abilityIdString != null && !abilityIdString.isBlank()) {
+                NBTUtil.setString(itemStack, CUSTOM_ITEM_ABILITY_IDS_NBT_KEY, abilityIdString, plugin);
+            }
 
         } else {
             // This should ideally not happen for valid materials

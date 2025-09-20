@@ -4,7 +4,9 @@ import com.x1f4r.mmocraft.command.AbstractPluginCommand;
 import com.x1f4r.mmocraft.command.CommandExecutable;
 import com.x1f4r.mmocraft.core.MMOCraftPlugin;
 import com.x1f4r.mmocraft.item.model.CustomItem;
+import com.x1f4r.mmocraft.item.model.ItemAbilityDescriptor;
 import com.x1f4r.mmocraft.item.service.CustomItemRegistry;
+import com.x1f4r.mmocraft.playerdata.model.Stat;
 import com.x1f4r.mmocraft.util.LoggingUtil;
 import com.x1f4r.mmocraft.util.StringUtil;
 import net.kyori.adventure.text.Component;
@@ -20,6 +22,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -219,12 +222,120 @@ public class ItemAdminCommand extends AbstractPluginCommand {
 
         sender.sendMessage(StringUtil.colorize("&6--- Registered Custom Items (" + filtered.size() + " found, page " + page + "/" + totalPages + ") ---"));
         filtered.subList(fromIndex, toIndex).forEach(item -> {
-            String line = StringUtil.colorize("&e- &f" + item.getItemId() + " &7-> &r" + item.getDisplayName());
-            sender.sendMessage(line);
+            String header = "&e- &f" + item.getItemId() + " &7-> &r" + item.getDisplayName()
+                    + " &7[" + item.getRarity().getDisplayName() + "&7]";
+            sender.sendMessage(StringUtil.colorize(header));
+
+            Map<Stat, Double> statModifiers = item.getStatModifiers();
+            if (statModifiers != null && !statModifiers.isEmpty()) {
+                String statSummary = statModifiers.entrySet().stream()
+                        .map(this::formatStatEntry)
+                        .collect(Collectors.joining("&7, "));
+                sender.sendMessage(StringUtil.colorize("   &7Stats: " + statSummary));
+            }
+
+            List<ItemAbilityDescriptor> abilities = item.getAbilityDescriptors();
+            if (abilities != null && !abilities.isEmpty()) {
+                sender.sendMessage(StringUtil.colorize("   &6Abilities:"));
+                for (ItemAbilityDescriptor ability : abilities) {
+                    List<String> metaParts = new ArrayList<>();
+                    if (!ability.activationHint().isBlank()) {
+                        metaParts.add("&f" + ability.activationHint());
+                    }
+                    if (ability.consumesMana()) {
+                        metaParts.add("&b" + formatNumber(ability.manaCost()) + " Mana");
+                    }
+                    if (ability.hasCooldown()) {
+                        metaParts.add("&b" + formatNumber(ability.cooldownSeconds()) + "s CD");
+                    }
+                    String metaSection = metaParts.isEmpty()
+                            ? ""
+                            : " &7(" + String.join("&7 | ", metaParts) + ")";
+                    sender.sendMessage(StringUtil.colorize("     &6• &e" + ability.displayName() + metaSection));
+
+                    if (ability.hasSummary()) {
+                        for (String line : wrapText(ability.summary(), 60)) {
+                            sender.sendMessage(StringUtil.colorize("       &7" + line));
+                        }
+                    }
+                }
+            }
+
+            List<String> recipeHints = item.getRecipeHints();
+            if (recipeHints != null && !recipeHints.isEmpty()) {
+                sender.sendMessage(StringUtil.colorize("   &7Recipe Hints:"));
+                for (String hint : recipeHints) {
+                    List<String> wrapped = wrapText(hint, 60);
+                    if (wrapped.isEmpty()) {
+                        continue;
+                    }
+                    for (int i = 0; i < wrapped.size(); i++) {
+                        String prefix = i == 0 ? "     &8• &f" : "       &f";
+                        sender.sendMessage(StringUtil.colorize(prefix + wrapped.get(i)));
+                    }
+                }
+            }
+
+            sender.sendMessage(StringUtil.colorize("   &8--------------------------------"));
         });
 
         logger.info("Item list requested by " + sender.getName() + ": " + filtered.size() + " match(es)");
         return true;
+    }
+
+    private String formatStatEntry(Map.Entry<Stat, Double> entry) {
+        double value = entry.getValue();
+        String color;
+        String prefix;
+        double magnitude = Math.abs(value);
+        if (value > 0) {
+            color = "&a";
+            prefix = "+";
+        } else if (value < 0) {
+            color = "&c";
+            prefix = "-";
+        } else {
+            color = "&7";
+            prefix = "";
+        }
+        return "&f" + entry.getKey().getDisplayName() + ": " + color + prefix + formatNumber(magnitude);
+    }
+
+    private String formatNumber(double value) {
+        if (Math.abs(value - Math.rint(value)) < 0.0001) {
+            return String.format(Locale.ROOT, "%.0f", value);
+        }
+        return String.format(Locale.ROOT, "%.1f", value);
+    }
+
+    private List<String> wrapText(String text, int maxLineLength) {
+        if (text == null) {
+            return Collections.emptyList();
+        }
+        String trimmed = text.trim();
+        if (trimmed.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> lines = new ArrayList<>();
+        String[] words = trimmed.split("\\s+");
+        StringBuilder current = new StringBuilder();
+        for (String word : words) {
+            if (current.length() == 0) {
+                current.append(word);
+                continue;
+            }
+            if (current.length() + 1 + word.length() <= maxLineLength) {
+                current.append(' ').append(word);
+            } else {
+                lines.add(current.toString());
+                current = new StringBuilder(word);
+            }
+        }
+        if (current.length() > 0) {
+            lines.add(current.toString());
+        }
+        return lines;
     }
 
     @Override

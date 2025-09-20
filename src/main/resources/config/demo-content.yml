@@ -50,6 +50,125 @@ loot-tables:
           chance: 0.25
           min: 1
           max: 1
+    - table-id: farming_patch_loot
+      entries:
+        - type: VANILLA
+          id: WHEAT
+          chance: 0.9
+          min: 2
+          max: 5
+        - type: VANILLA
+          id: CARROT
+          chance: 0.5
+          min: 1
+          max: 3
+        - type: VANILLA
+          id: PUMPKIN
+          chance: 0.25
+          min: 1
+          max: 1
+    - table-id: herbal_patch_loot
+      entries:
+        - type: VANILLA
+          id: SUGAR_CANE
+          chance: 0.85
+          min: 2
+          max: 5
+        - type: VANILLA
+          id: MELON_SLICE
+          chance: 0.5
+          min: 1
+          max: 3
+        - type: VANILLA
+          id: RABBIT_FOOT
+          chance: 0.2
+          min: 1
+          max: 1
+    - table-id: grove_commission_loot
+      entries:
+        - type: VANILLA
+          id: OAK_LOG
+          chance: 1.0
+          min: 1
+          max: 3
+        - type: VANILLA
+          id: STICK
+          chance: 0.75
+          min: 2
+          max: 4
+        - type: VANILLA
+          id: BONE_MEAL
+          chance: 0.4
+          min: 1
+          max: 2
+    - table-id: mining_commission_loot
+      entries:
+        - type: VANILLA
+          id: RAW_GOLD
+          chance: 0.65
+          min: 1
+          max: 2
+        - type: VANILLA
+          id: REDSTONE
+          chance: 0.8
+          min: 3
+          max: 6
+        - type: VANILLA
+          id: EMERALD
+          chance: 0.35
+          min: 1
+          max: 2
+        - type: VANILLA
+          id: NETHERITE_SCRAP
+          chance: 0.1
+          min: 1
+          max: 1
+    - table-id: ember_commission_loot
+      entries:
+        - type: VANILLA
+          id: MAGMA_CREAM
+          chance: 0.75
+          min: 1
+          max: 2
+        - type: VANILLA
+          id: BLAZE_POWDER
+          chance: 0.9
+          min: 2
+          max: 4
+        - type: VANILLA
+          id: GHAST_TEAR
+          chance: 0.25
+          min: 1
+          max: 1
+    - table-id: wind_commission_loot
+      entries:
+        - type: VANILLA
+          id: PHANTOM_MEMBRANE
+          chance: 0.45
+          min: 1
+          max: 2
+        - type: VANILLA
+          id: FEATHER
+          chance: 0.8
+          min: 2
+          max: 5
+    - table-id: tidal_commission_loot
+      entries:
+        - type: VANILLA
+          id: PRISMARINE_SHARD
+          chance: 0.75
+          min: 1
+          max: 3
+        - type: VANILLA
+          id: PRISMARINE_CRYSTALS
+          chance: 0.6
+          min: 1
+          max: 2
+        - type: VANILLA
+          id: NAUTILUS_SHELL
+          chance: 0.2
+          min: 1
+          max: 1
 
 resource-nodes:
   types:
@@ -76,6 +195,79 @@ resource-nodes:
       loot-table-id: iron_ore_node_loot
       respawn-seconds: 180
       display-name: "&fIron Vein"
+    - type-id: farming_patch
+      block: HAY_BLOCK
+      harvest-seconds: 6.0
+      required-tools:
+        - WOODEN_HOE
+        - STONE_HOE
+        - IRON_HOE
+        - DIAMOND_HOE
+        - NETHERITE_HOE
+      loot-table-id: farming_patch_loot
+      respawn-seconds: 45
+      display-name: "&eFarming Plot"
+    - type-id: herbal_patch
+      block: MOSS_BLOCK
+      harvest-seconds: 6.0
+      required-tools:
+        - WOODEN_HOE
+        - STONE_HOE
+        - IRON_HOE
+        - DIAMOND_HOE
+        - NETHERITE_HOE
+      loot-table-id: herbal_patch_loot
+      respawn-seconds: 45
+      display-name: "&aHerbal Patch"
+    - type-id: grove_commission
+      block: OAK_LOG
+      harvest-seconds: 8.0
+      required-tools:
+        - WOODEN_AXE
+        - STONE_AXE
+        - IRON_AXE
+        - DIAMOND_AXE
+        - NETHERITE_AXE
+      loot-table-id: grove_commission_loot
+      respawn-seconds: 90
+      display-name: "&2Grove Clearing"
+    - type-id: mining_commission
+      block: DEEPSLATE_REDSTONE_ORE
+      harvest-seconds: 12.0
+      required-tools:
+        - IRON_PICKAXE
+        - DIAMOND_PICKAXE
+        - NETHERITE_PICKAXE
+      loot-table-id: mining_commission_loot
+      respawn-seconds: 120
+      display-name: "&6Commission Lode"
+    - type-id: ember_commission
+      block: MAGMA_BLOCK
+      harvest-seconds: 14.0
+      required-tools:
+        - DIAMOND_PICKAXE
+        - NETHERITE_PICKAXE
+      loot-table-id: ember_commission_loot
+      respawn-seconds: 150
+      display-name: "&cEmber Commission"
+    - type-id: wind_commission
+      block: WHITE_WOOL
+      harvest-seconds: 5.0
+      required-tools:
+        - SHEARS
+      loot-table-id: wind_commission_loot
+      respawn-seconds: 60
+      display-name: "&bWind Tossed Nest"
+    - type-id: tidal_commission
+      block: PRISMARINE
+      harvest-seconds: 10.0
+      required-tools:
+        - IRON_PICKAXE
+        - DIAMOND_PICKAXE
+        - NETHERITE_PICKAXE
+      loot-table-id: tidal_commission_loot
+      respawn-seconds: 120
+      display-name: "&3Tidal Cache"
   placements:
     - node-type-id: stone_node
       x: 10
@@ -89,6 +281,42 @@ resource-nodes:
       x: 10
       y: 60
       z: 12
+    - node-type-id: farming_patch
+      x: 20
+      y: 64
+      z: 20
+    - node-type-id: farming_patch
+      x: 22
+      y: 64
+      z: 20
+    - node-type-id: herbal_patch
+      x: 24
+      y: 64
+      z: 20
+    - node-type-id: grove_commission
+      x: 20
+      y: 64
+      z: 24
+    - node-type-id: mining_commission
+      x: 30
+      y: 60
+      z: 10
+    - node-type-id: mining_commission
+      x: 32
+      y: 60
+      z: 10
+    - node-type-id: ember_commission
+      x: 28
+      y: 58
+      z: 8
+    - node-type-id: wind_commission
+      x: 18
+      y: 70
+      z: 18
+    - node-type-id: tidal_commission
+      x: 35
+      y: 62
+      z: 14
 
 custom-spawns:
   - rule-id: plains_skeletal_warriors_night
