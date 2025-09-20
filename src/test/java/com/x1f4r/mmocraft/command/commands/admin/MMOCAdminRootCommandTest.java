@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -21,7 +22,7 @@ class MMOCAdminRootCommandTest {
 
     @BeforeEach
     void setUp() {
-        when(sender.hasPermission("mmocraft.admin")).thenReturn(true);
+        when(sender.hasPermission(anyString())).thenReturn(true);
     }
 
     @Test
@@ -32,6 +33,8 @@ class MMOCAdminRootCommandTest {
 
         assertTrue(handled);
         verify(plugin).reloadPluginConfig();
-        verify(sender).sendMessage(contains("configuration reloaded"));
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(sender).sendMessage(messageCaptor.capture());
+        assertTrue(messageCaptor.getValue().contains("configuration reloaded"));
     }
 }

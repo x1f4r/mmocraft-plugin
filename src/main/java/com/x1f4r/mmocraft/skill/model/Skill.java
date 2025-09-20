@@ -1,7 +1,9 @@
 package com.x1f4r.mmocraft.skill.model;
 
+import com.x1f4r.mmocraft.config.gameplay.RuntimeStatConfig;
 import com.x1f4r.mmocraft.core.MMOCraftPlugin; // Added for service access
 import com.x1f4r.mmocraft.playerdata.model.PlayerProfile;
+import com.x1f4r.mmocraft.playerdata.model.Stat;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 
@@ -71,7 +73,8 @@ public abstract class Skill {
      * @return True if the skill can be used, false otherwise.
      */
     public boolean canUse(PlayerProfile casterProfile) {
-        if (casterProfile.getCurrentMana() < this.manaCost) {
+        double effectiveManaCost = getEffectiveManaCost(casterProfile);
+        if (casterProfile.getCurrentMana() < Math.ceil(effectiveManaCost)) {
             // Optionally send message to player: casterProfile.getPlayer().sendMessage("Not enough mana!");
             return false;
         }
@@ -100,9 +103,77 @@ public abstract class Skill {
      * @param casterProfile The profile of the player who used the skill.
      */
     public void onCooldown(PlayerProfile casterProfile) {
-        if (this.cooldownSeconds > 0) {
-            casterProfile.setSkillCooldown(this.skillId, this.cooldownSeconds);
+        double effectiveCooldown = getEffectiveCooldownSeconds(casterProfile);
+        if (effectiveCooldown > 0) {
+            casterProfile.setSkillCooldown(this.skillId, effectiveCooldown);
         }
+    }
+
+    /**
+     * Calculates the effective mana cost after applying runtime stat modifiers.
+     *
+     * @param casterProfile player profile of the caster.
+     * @return effective mana cost as a double.
+     */
+    public double getEffectiveManaCost(PlayerProfile casterProfile) {
+        if (casterProfile == null) {
+            return manaCost;
+        }
+        RuntimeStatConfig.AbilitySettings abilitySettings = getRuntimeAbilitySettings();
+        if (abilitySettings == null || manaCost <= 0) {
+            return manaCost;
+        }
+        double intelligence = casterProfile.getStatValue(Stat.INTELLIGENCE);
+        double abilityPower = casterProfile.getStatValue(Stat.ABILITY_POWER);
+        double reduction = (intelligence * abilitySettings.getManaCostReductionPerIntelligencePoint())
+                + (abilityPower * abilitySettings.getManaCostReductionPerAbilityPowerPoint());
+        double multiplier = Math.max(abilitySettings.getMinimumManaCostMultiplier(), 1.0 - reduction);
+        double effectiveCost = manaCost * multiplier;
+        if (abilitySettings.getMinimumManaCost() > 0) {
+            effectiveCost = Math.max(abilitySettings.getMinimumManaCost(), effectiveCost);
+        }
+        return Math.max(0.0, effectiveCost);
+    }
+
+    /**
+     * Consumes mana from the profile using the effective cost and returns the amount spent.
+     */
+    public long applyManaCost(PlayerProfile casterProfile) {
+        double effectiveCost = getEffectiveManaCost(casterProfile);
+        long manaToConsume = (long) Math.ceil(Math.max(0.0, effectiveCost));
+        if (manaToConsume > 0) {
+            casterProfile.consumeMana(manaToConsume);
+        }
+        return manaToConsume;
+    }
+
+    /**
+     * Calculates the effective cooldown after stat-based reductions.
+     */
+    public double getEffectiveCooldownSeconds(PlayerProfile casterProfile) {
+        if (casterProfile == null) {
+            return cooldownSeconds;
+        }
+        RuntimeStatConfig.AbilitySettings abilitySettings = getRuntimeAbilitySettings();
+        if (abilitySettings == null || cooldownSeconds <= 0) {
+            return cooldownSeconds;
+        }
+        double attackSpeed = casterProfile.getStatValue(Stat.ATTACK_SPEED);
+        double intelligence = casterProfile.getStatValue(Stat.INTELLIGENCE);
+        double reduction = (attackSpeed * abilitySettings.getCooldownReductionPerAttackSpeedPoint())
+                + (intelligence * abilitySettings.getCooldownReductionPerIntelligencePoint());
+        double multiplier = Math.max(0.0, 1.0 - reduction);
+        double effectiveCooldown = cooldownSeconds * multiplier;
+        effectiveCooldown = Math.max(abilitySettings.getMinimumCooldownSeconds(), effectiveCooldown);
+        return Math.max(0.0, effectiveCooldown);
+    }
+
+    private RuntimeStatConfig.AbilitySettings getRuntimeAbilitySettings() {
+        if (plugin == null || plugin.getGameplayConfigService() == null) {
+            return null;
+        }
+        RuntimeStatConfig runtimeConfig = plugin.getGameplayConfigService().getRuntimeStatConfig();
+        return runtimeConfig != null ? runtimeConfig.getAbilitySettings() : null;
     }
 
     @Override

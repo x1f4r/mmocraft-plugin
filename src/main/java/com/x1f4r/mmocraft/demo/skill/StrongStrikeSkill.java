@@ -100,6 +100,6 @@ public class StrongStrikeSkill extends Skill {
         casterPlayer.getWorld().playSound(casterPlayer.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 1.0f, 1.0f);
         livingTarget.getWorld().playSound(livingTarget.getLocation(), Sound.ENTITY_GENERIC_HURT, 1.0f, 1.0f);
 
-        casterProfile.setCurrentMana(casterProfile.getCurrentMana() - (long) getManaCost());
+        applyManaCost(casterProfile);
     }
 }

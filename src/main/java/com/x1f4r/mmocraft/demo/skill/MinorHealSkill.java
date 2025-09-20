@@ -67,6 +67,6 @@ public class MinorHealSkill extends Skill {
         logger.info(casterPlayer.getName() + " used Minor Heal, restoring " + actualHeal + " health.");
 
         casterPlayer.getWorld().playSound(casterPlayer.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.5f);
-        casterProfile.setCurrentMana(casterProfile.getCurrentMana() - (long) getManaCost());
+        applyManaCost(casterProfile);
     }
 }

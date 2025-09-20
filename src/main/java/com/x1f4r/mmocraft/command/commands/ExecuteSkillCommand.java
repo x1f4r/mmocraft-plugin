@@ -71,13 +71,15 @@ public class ExecuteSkillCommand extends AbstractPluginCommand {
         Skill skill = optionalSkill.get();
 
         // --- Pre-Execution Checks ---
+        double effectiveManaCost = skill.getEffectiveManaCost(casterProfile);
+
         if (!skill.canUse(casterProfile)) {
             if (casterProfile.isSkillOnCooldown(skillId)) {
                 long remainingMillis = casterProfile.getSkillRemainingCooldown(skillId);
                 double remainingSeconds = remainingMillis / 1000.0;
                 casterPlayer.sendMessage(StringUtil.colorize("&c" + skill.getSkillName() + " is on cooldown for " + String.format("%.1f", remainingSeconds) + "s."));
-            } else if (casterProfile.getCurrentMana() < skill.getManaCost()) {
-                casterPlayer.sendMessage(StringUtil.colorize("&cNot enough mana for " + skill.getSkillName() + ". (Need " + skill.getManaCost() + ")"));
+            } else if (casterProfile.getCurrentMana() < Math.ceil(effectiveManaCost)) {
+                casterPlayer.sendMessage(StringUtil.colorize("&cNot enough mana for " + skill.getSkillName() + ". (Need " + String.format("%.1f", effectiveManaCost) + ")"));
             } else {
                  casterPlayer.sendMessage(StringUtil.colorize("&cYou cannot use " + skill.getSkillName() + " right now."));
             }

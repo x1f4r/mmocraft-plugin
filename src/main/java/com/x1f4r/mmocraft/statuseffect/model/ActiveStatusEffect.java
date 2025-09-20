@@ -13,6 +13,7 @@ public class ActiveStatusEffect {
 
     private final StatusEffect statusEffect;
     private final UUID targetId; // UUID of the LivingEntity this effect is on
+    private final UUID instanceId;
     private final long applicationTimeMillis;
     private long expirationTimeMillis; // System.currentTimeMillis() + duration. Long.MAX_VALUE if permanent.
     private long nextTickTimeMillis;   // For effects with tickIntervalSeconds > 0
@@ -27,6 +28,7 @@ public class ActiveStatusEffect {
     public ActiveStatusEffect(StatusEffect statusEffect, UUID targetId) {
         this.statusEffect = Objects.requireNonNull(statusEffect, "StatusEffect cannot be null.");
         this.targetId = Objects.requireNonNull(targetId, "Target UUID cannot be null.");
+        this.instanceId = UUID.randomUUID();
         this.applicationTimeMillis = System.currentTimeMillis();
 
         if (statusEffect.isPermanent()) {
@@ -46,6 +48,7 @@ public class ActiveStatusEffect {
     // Getters
     public StatusEffect getStatusEffect() { return statusEffect; }
     public UUID getTargetId() { return targetId; }
+    public UUID getInstanceId() { return instanceId; }
     public long getApplicationTimeMillis() { return applicationTimeMillis; }
     public long getExpirationTimeMillis() { return expirationTimeMillis; }
     public long getNextTickTimeMillis() { return nextTickTimeMillis; }

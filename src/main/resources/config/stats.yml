@@ -117,3 +117,46 @@ combat:
   max-damage-reduction: 0.9
   max-evasion-chance: 0.6
 
+runtime:
+  movement:
+    base-walk-speed: 0.2
+    max-walk-speed: 0.6
+    min-walk-speed: 0.05
+    speed-baseline: 100.0
+  combat:
+    base-attack-speed: 4.0
+    attack-speed-per-point: 0.02
+    max-attack-speed: 8.0
+    strength-physical-scaling: 0.5
+    intelligence-magical-scaling: 0.7
+    ability-power-percent-per-point: 1.0
+    ferocity-per-extra-hit: 100.0
+    ferocity-max-extra-hits: 4
+    mob-defense-reduction-factor: 0.04
+  ability:
+    cooldown-reduction-per-attack-speed-point: 0.002
+    cooldown-reduction-per-intelligence-point: 0.0
+    minimum-cooldown-seconds: 0.2
+    mana-cost-reduction-per-intelligence-point: 0.001
+    mana-cost-reduction-per-ability-power-point: 0.001
+    minimum-mana-cost-multiplier: 0.2
+    minimum-mana-cost: 1.0
+  gathering:
+    base-gather-delay-seconds: 1.0
+    minimum-gather-delay-seconds: 0.25
+    mining-speed-delay-divisor: 100.0
+    mining-speed-haste-per-tier: 80.0
+    mining-speed-max-haste-tier: 4
+    fortune-per-point:
+      mining_fortune: 0.002
+      farming_fortune: 0.002
+      foraging_fortune: 0.002
+      fishing_fortune: 0.0015
+  mobs:
+    health-per-level-percent: 0.05
+    damage-per-level-percent: 0.03
+    defense-per-level: 0.5
+    max-health-multiplier: 5.0
+    max-damage-multiplier: 5.0
+    max-defense-bonus: 200.0
+

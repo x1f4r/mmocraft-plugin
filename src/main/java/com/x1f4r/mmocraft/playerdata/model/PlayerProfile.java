@@ -43,6 +43,7 @@ public class PlayerProfile {
 
     // --- Equipment Stat Modifiers ---
     private final Map<Stat, Double> equipmentStatModifiers = new EnumMap<>(Stat.class); // Added
+    private final Map<String, Map<Stat, Double>> temporaryStatModifiers = new ConcurrentHashMap<>();
     private final Map<Stat, Double> effectiveStats = new EnumMap<>(Stat.class);
 
     // --- Derived Secondary Stats ---
@@ -171,7 +172,7 @@ public class PlayerProfile {
      * @return Base plus equipment contributions.
      */
     public double getTotalInvestedStatValue(Stat stat) {
-        return getBaseStatValue(stat) + getEquipmentStatModifier(stat);
+        return getBaseStatValue(stat) + getEquipmentStatModifier(stat) + getTemporaryStatModifierTotal(stat);
     }
 
     public LocalDateTime getFirstLogin() { return firstLogin; }
@@ -249,6 +250,82 @@ public class PlayerProfile {
         }
         modifiers.forEach((stat, value) -> equipmentStatModifiers.merge(stat, value, Double::sum));
         // recalculateDerivedAttributes(); // Manager will call this once at the end
+    }
+
+    private double getTemporaryStatModifierTotal(Stat stat) {
+        double total = 0.0;
+        for (Map<Stat, Double> map : temporaryStatModifiers.values()) {
+            total += map.getOrDefault(stat, 0.0);
+        }
+        return total;
+    }
+
+    /**
+     * Applies or replaces a set of temporary stat modifiers associated with a specific source.
+     * Temporary modifiers include contributions from status effects, zone bonuses and other
+     * ephemeral gameplay systems.
+     *
+     * @param sourceKey A unique key representing the source of the modifier bundle.
+     * @param modifiers The stat values to apply. Passing {@code null} or an empty map clears the source.
+     */
+    public void setTemporaryStatModifiers(String sourceKey, Map<Stat, Double> modifiers) {
+        Objects.requireNonNull(sourceKey, "sourceKey");
+        if (modifiers == null || modifiers.isEmpty()) {
+            clearTemporaryStatModifiers(sourceKey);
+            return;
+        }
+        EnumMap<Stat, Double> copy = new EnumMap<>(Stat.class);
+        for (Map.Entry<Stat, Double> entry : modifiers.entrySet()) {
+            if (entry.getKey() != null && entry.getValue() != null && entry.getValue() != 0.0) {
+                copy.put(entry.getKey(), entry.getValue());
+            }
+        }
+        if (copy.isEmpty()) {
+            clearTemporaryStatModifiers(sourceKey);
+            return;
+        }
+        temporaryStatModifiers.put(sourceKey, copy);
+        recalculateDerivedAttributes();
+    }
+
+    /**
+     * Adds a single stat modifier contribution for a source, stacking with existing values.
+     *
+     * @param sourceKey Identifier of the modifier bundle.
+     * @param stat      The stat being modified.
+     * @param value     The amount to add (can be negative).
+     */
+    public void addTemporaryStatModifier(String sourceKey, Stat stat, double value) {
+        Objects.requireNonNull(sourceKey, "sourceKey");
+        Objects.requireNonNull(stat, "stat");
+        temporaryStatModifiers
+                .computeIfAbsent(sourceKey, k -> new EnumMap<>(Stat.class))
+                .merge(stat, value, Double::sum);
+        recalculateDerivedAttributes();
+    }
+
+    /**
+     * Clears all modifiers contributed by a specific source.
+     *
+     * @param sourceKey Identifier of the modifier bundle.
+     */
+    public void clearTemporaryStatModifiers(String sourceKey) {
+        if (sourceKey == null) {
+            return;
+        }
+        if (temporaryStatModifiers.remove(sourceKey) != null) {
+            recalculateDerivedAttributes();
+        }
+    }
+
+    /**
+     * Clears all temporary modifiers currently applied to the profile.
+     */
+    public void clearAllTemporaryStatModifiers() {
+        if (!temporaryStatModifiers.isEmpty()) {
+            temporaryStatModifiers.clear();
+            recalculateDerivedAttributes();
+        }
     }
 
     /**
